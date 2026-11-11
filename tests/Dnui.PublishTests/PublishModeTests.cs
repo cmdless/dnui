@@ -71,7 +71,7 @@ public class PublishModeTests
         return output.Trim().Split('\n')[^1].Trim();
     }
 
-    private static async Task<(int Code, string Output)> RunAsync(string file, string[] args, Dictionary<string, string>? env, TimeSpan timeout)
+    internal static async Task<(int Code, string Output)> RunAsync(string file, string[] args, Dictionary<string, string>? env, TimeSpan timeout)
     {
         var info = new ProcessStartInfo(file) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
         foreach (var arg in args)

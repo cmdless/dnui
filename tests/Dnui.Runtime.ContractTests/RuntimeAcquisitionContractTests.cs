@@ -33,14 +33,10 @@ public class RuntimeAcquisitionContractTests
     {
         Assert.SkipUnless(TestPaths.HasPackageForCurrentRid, $"Run PackRuntime for {DnuiRuntime.CurrentRid} first.");
         using var root = new TempDir();
-        var options = new DnuiTrayOptions
-        {
-            Runtime = new() { CmdlessRoot = root.Path, PackageSource = TestPaths.PackagesFeed },
-            Headless = true,
-            Items = [new("open", "Open")],
-        };
+        var host = new DnuiHost(new() { Runtime = new() { CmdlessRoot = root.Path, PackageSource = TestPaths.PackagesFeed }, Headless = true });
+        var options = new DnuiTrayOptions { Items = [new("open", "Open")] };
 
-        var trays = await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => DnuiTray.StartAsync(options)));
+        var trays = await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => host.StartTrayAsync(options)));
         try
         {
             Assert.All(trays, t => Assert.Equal(DnuiRuntime.Version, t.RuntimeVersion));

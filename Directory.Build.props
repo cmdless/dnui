@@ -10,4 +10,25 @@
          MUST build against the same Avalonia version. -->
     <AvaloniaVersion>12.1.5</AvaloniaVersion>
   </PropertyGroup>
+
+  <!-- Package metadata shared by every published package (spec 003 research R8). The runtime
+       packages get the same values through their nuspec (build/RuntimePackage). -->
+  <PropertyGroup>
+    <Authors>Cmdless</Authors>
+    <Company>Cmdless</Company>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/cmdless/dnui</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/cmdless/dnui</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>dnui;cmdless;avalonia;ui;tray;dialog</PackageTags>
+    <PackageIcon>icon.png</PackageIcon>
+    <DnuiPackageAssets>$(MSBuildThisFileDirectory)build/package/</DnuiPackageAssets>
+    <!-- SourceLink is built into the SDK; deterministic paths on CI. -->
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsPackable)' != 'false'">
+    <None Include="$(DnuiPackageAssets)icon.png" Pack="true" PackagePath="icon.png" Visible="false" />
+  </ItemGroup>
 </Project>

@@ -1,18 +1,22 @@
 name: release
 
 # Release = push a tag matching DnuiRuntimeVersion, e.g. `git tag v0.1.0 && git push origin v0.1.0`.
-# "Run workflow" (manual) does a dry run: packs and uploads artifacts, creates no release.
+# The publish job waits for approval in the `nuget` environment, then publishes to nuget.org with
+# trusted publishing (no stored API key). Runtime packages go first; the library and the tool only
+# after every runtime package is downloadable (specs/003-tool-publishing/contracts/release.md).
+# "Run workflow" (manual) is a dry run: packs and uploads artifacts, publishes and releases nothing.
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   pack:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -37,16 +41,96 @@ jobs:
             dotnet build Dnui.Runtime -t:PackRuntime -p:RuntimeIdentifier=$rid
           done
 
-      - name: Pack library
-        run: dotnet pack Dnui/Dnui.csproj -c Release -o artifacts/packages
+      - name: Pack library and tool (with symbols)
+        run: |
+          dotnet pack Dnui/Dnui.csproj -c Release -o artifacts/packages
+          dotnet pack Dnui.Tool/Dnui.Tool.csproj -c Release -o artifacts/packages
+
+      - name: Check package sizes (nuget.org limit)
+        run: scripts/release/check-sizes.sh artifacts/packages
 
       - uses: actions/upload-artifact@v4
         with:
           name: packages-${{ steps.version.outputs.version }}
-          path: artifacts/packages/*.nupkg
+          path: |
+            artifacts/packages/*.nupkg
+            artifacts/packages/*.snupkg
+          if-no-files-found: error
 
-      - name: Create GitHub Release
-        if: github.ref_type == 'tag'
+  publish:
+    if: github.ref_type == 'tag'
+    needs: pack
+    runs-on: ubuntu-latest
+    environment: nuget
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      VERSION: ${{ needs.pack.outputs.version }}
+      FEED: https://api.nuget.org/v3/index.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages-${{ needs.pack.outputs.version }}
+          path: packages
+
+      - name: NuGet login (trusted publishing)
+        id: login-runtime
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push runtime packages
+        run: |
+          for pkg in packages/Cmdless.Dnui.Runtime.*.${VERSION}.nupkg; do
+            dotnet nuget push "$pkg" --api-key "${{ steps.login-runtime.outputs.NUGET_API_KEY }}" --source "$FEED" --skip-duplicate
+          done
+
+      - name: Wait until every runtime package is downloadable
+        run: |
+          scripts/release/wait-for-packages.sh "$VERSION" \
+            Cmdless.Dnui.Runtime.win-x64 Cmdless.Dnui.Runtime.win-arm64 \
+            Cmdless.Dnui.Runtime.osx-x64 Cmdless.Dnui.Runtime.osx-arm64 \
+            Cmdless.Dnui.Runtime.linux-x64 Cmdless.Dnui.Runtime.linux-arm64
+
+      # A fresh short-lived key: the wait above can outlast the first one.
+      - name: NuGet login (library and tool)
+        id: login-rest
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push library and tool (symbols go up alongside)
+        run: |
+          for id in Cmdless.Dnui Cmdless.Dnui.Tool; do
+            dotnet nuget push "packages/$id.${VERSION}.nupkg" --api-key "${{ steps.login-rest.outputs.NUGET_API_KEY }}" --source "$FEED" --skip-duplicate
+          done
+
+  github-release:
+    if: github.ref_type == 'tag'
+    needs: [pack, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages-${{ needs.pack.outputs.version }}
+          path: packages
+
+      - name: Create or update the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" artifacts/packages/*.nupkg --title "${GITHUB_REF_NAME}" --generate-notes
+          REPO: ${{ github.repository }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" --repo "$REPO" > /dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" packages/* --repo "$REPO" --clobber
+          else
+            prerelease=""
+            case "${GITHUB_REF_NAME}" in *-*) prerelease="--prerelease" ;; esac
+            gh release create "${GITHUB_REF_NAME}" packages/* --repo "$REPO" --title "${GITHUB_REF_NAME}" --generate-notes $prerelease
+          fi

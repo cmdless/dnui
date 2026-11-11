@@ -2,18 +2,12 @@ using Dnui.Tray;
 
 namespace Dnui;
 
-/// <summary>Options for <see cref="DnuiTray.StartAsync"/>.</summary>
+/// <summary>
+/// What a tray shows, for <see cref="IDnuiHostCommands.StartTrayAsync"/>. The runtime, headless
+/// mode, and app come from the host (<see cref="DnuiHostOptions"/>, <see cref="IDnuiHostCommands.WithApp{TApp}"/>).
+/// </summary>
 public sealed record DnuiTrayOptions
 {
-    /// <summary>How the runtime is found. Null means defaults: found or downloaded automatically.</summary>
-    public DnuiRuntimeOptions? Runtime { get; init; }
-
-    /// <summary>Optional app assembly (<c>--app-assembly</c>); requires <see cref="AppType"/>.</summary>
-    public string? AppAssembly { get; init; }
-
-    /// <summary>Optional app type (<c>--app-type</c>), deriving from <see cref="DnuiCommandApp"/>.</summary>
-    public string? AppType { get; init; }
-
     /// <summary>The tray icon. The tray is invisible until an icon is set.</summary>
     public DnuiTrayIcon? Icon { get; init; }
 
@@ -26,8 +20,13 @@ public sealed record DnuiTrayOptions
     /// <summary>How long dispose waits for the runtime to exit before killing it.</summary>
     public TimeSpan ShutdownTimeout { get; init; } = TimeSpan.FromSeconds(5);
 
-    /// <summary>Runs <c>tray --headless</c>: everything but the OS tray icon (tests, CI).</summary>
-    public bool Headless { get; init; }
+    /// <summary>
+    /// Runs on the created tray before it starts: attach <see cref="DnuiTray.Opened"/>,
+    /// <see cref="DnuiTray.Clicked"/>, and <see cref="DnuiTray.UnhandledHandlerException"/> here so no
+    /// event is missed. Tray methods called inside throw <see cref="DnuiTrayNotRunningException"/>.
+    /// If it throws, the runtime is stopped and the exception is rethrown from start.
+    /// </summary>
+    public Action<DnuiTray>? Configure { get; init; }
 }
 
 /// <summary>A tray menu item. Ids must be non-empty and unique across the whole menu.</summary>

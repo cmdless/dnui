@@ -42,8 +42,7 @@ public class ParentOfExternalChildWindow : DnuiWindow
     public ParentOfExternalChildWindow() => Opened += async (_, _) =>
     {
         var path = Environment.GetEnvironmentVariable("DNUI_TEST_EXTRA")!;
-        var extra = Assembly.LoadFrom(path);
-        var result = await Ui.OpenWindowAsync(extra, "Dnui.TestApps.Extra.ExtraChildWindow");
+        var result = await Ui.OpenWindowAsync(path, "Dnui.TestApps.Extra.ExtraChildWindow");
         Console.Error.WriteLine($"dnui-test: pid={Environment.ProcessId} extra-loaded={AppDomain.CurrentDomain.GetAssemblies().Any(a => a.GetName().Name == "Dnui.TestApps.Extra")}");
         Resolve(new JsonObject { ["child"] = result });
     };

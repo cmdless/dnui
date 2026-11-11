@@ -12,7 +12,7 @@ try
         Headless = args.Contains("--self-test"),
     });
 
-    var result = await host.OpenWindowAsync<SampleWindow, SampleApp>();
+    var result = await host.WithApp<SampleApp>().OpenWindowAsync<SampleWindow>();
     Console.WriteLine(result?.ToJsonString() ?? "null");
     return 0;
 }

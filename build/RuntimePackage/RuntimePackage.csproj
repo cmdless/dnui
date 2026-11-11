@@ -7,7 +7,7 @@
     <NoWarn>$(NoWarn);NU5100;NU5128</NoWarn>
     <NuspecFile>$(MSBuildThisFileDirectory)Cmdless.Dnui.Runtime.nuspec</NuspecFile>
     <!-- DnuiRid and DnuiPublishDir come from PackRuntime; the version from Directory.Build.props. -->
-    <NuspecProperties>id=Cmdless.Dnui.Runtime.$(DnuiRid);version=$(DnuiRuntimeVersion);rid=$(DnuiRid)</NuspecProperties>
+    <NuspecProperties>id=Cmdless.Dnui.Runtime.$(DnuiRid);version=$(DnuiRuntimeVersion);rid=$(DnuiRid);authors=$(Authors);license=$(PackageLicenseExpression);projectUrl=$(PackageProjectUrl);repositoryUrl=$(RepositoryUrl);icon=$(DnuiPackageAssets)icon.png;readme=$(DnuiPackageAssets)readme/Runtime.md</NuspecProperties>
     <!-- File sources are relative to the publish folder, so package paths never depend on how
          NuGet splits an absolute wildcard path (it nested them under runtime/<rid>/ on Windows). -->
     <NuspecBasePath>$(DnuiPublishDir)</NuspecBasePath>

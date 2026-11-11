@@ -9,8 +9,9 @@ using StreamJsonRpc.Protocol;
 namespace Dnui;
 
 /// <summary>
-/// A tray icon shown by the Dnui runtime and controlled from .NET (contracts/tray-client.md). The
-/// runtime is found or downloaded automatically. Dispose to remove the tray.
+/// A tray icon shown by the Dnui runtime and controlled from .NET. Start one with
+/// <see cref="IDnuiHostCommands.StartTrayAsync"/>; the runtime is found or downloaded
+/// automatically. Dispose to remove the tray.
 /// </summary>
 public sealed class DnuiTray : IAsyncDisposable
 {
@@ -19,13 +20,16 @@ public sealed class DnuiTray : IAsyncDisposable
     private readonly TimeSpan _shutdownTimeout;
     private readonly Channel<TrayEvent> _events = Channel.CreateUnbounded<TrayEvent>(new UnboundedChannelOptions { SingleReader = true });
     private readonly ConcurrentQueue<(TrayEvent Event, TaskCompletionSource Raised)> _waiters = new();
+    private readonly IDisposable _tracking;
     private int _disposed;
+    private int _started;
 
-    private DnuiTray(Process process, JsonRpc rpc, TimeSpan shutdownTimeout)
+    private DnuiTray(Process process, JsonRpc rpc, TimeSpan shutdownTimeout, IDisposable tracking)
     {
         _process = process;
         _rpc = rpc;
         _shutdownTimeout = shutdownTimeout;
+        _tracking = tracking;
         Completion = WaitForExitAsync();
         _ = Task.Run(RaiseEventsAsync);
     }
@@ -46,45 +50,35 @@ public sealed class DnuiTray : IAsyncDisposable
     public Task<DnuiResult> Completion { get; }
 
     /// <summary>
-    /// Resolves (and if needed downloads) the runtime, starts it, and completes once the tray has
-    /// been initialized with the icon, tooltip, and items from <paramref name="options"/>.
+    /// Starts the runtime from <paramref name="launch"/> (the host's runtime, headless mode, and app,
+    /// plus <c>tray</c>), creates the tray, runs <see cref="DnuiTrayOptions.Configure"/>, and completes
+    /// once the tray has been initialized with the icon, tooltip, and items from <paramref name="options"/>.
+    /// Public callers start trays through <see cref="IDnuiHostCommands.StartTrayAsync"/>.
     /// </summary>
     /// <exception cref="DnuiRuntimeUnavailableException">The runtime could not be obtained.</exception>
-    /// <exception cref="DnuiTrayStartException">The runtime exited before the tray started.</exception>
+    /// <exception cref="DnuiCommandException">The runtime exited before the tray started.</exception>
     /// <exception cref="DnuiTrayProtocolException">The runtime rejected the initial icon or items.</exception>
-    public static async Task<DnuiTray> StartAsync(DnuiTrayOptions options, CancellationToken cancellationToken = default)
+    internal static async Task<DnuiTray> StartAsync(Hosting.RuntimeLaunch launch, DnuiTrayOptions options, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(options);
-        var runtimePath = await DnuiRuntime.ResolveAsync(options.Runtime, cancellationToken).ConfigureAwait(false);
-
-        var startInfo = new ProcessStartInfo(runtimePath)
-        {
-            UseShellExecute = false,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = false,
-            CreateNoWindow = true,
-        };
-        if (options.AppAssembly is not null || options.AppType is not null)
-        {
-            startInfo.ArgumentList.Add("--app-assembly");
-            startInfo.ArgumentList.Add(options.AppAssembly ?? string.Empty);
-            startInfo.ArgumentList.Add("--app-type");
-            startInfo.ArgumentList.Add(options.AppType ?? string.Empty);
-        }
-
-        startInfo.ArgumentList.Add("tray");
-        if (options.Headless)
-        {
-            startInfo.ArgumentList.Add("--headless");
-        }
-
-        var process = Process.Start(startInfo) ?? throw new InvalidOperationException($"Could not start '{runtimePath}'.");
+        var (process, tracking) = await Hosting.RuntimeLauncher.StartProtocolAsync(launch, cancellationToken).ConfigureAwait(false);
         var rpc = TrayProtocol.CreateConnection(process.StandardInput.BaseStream, process.StandardOutput.BaseStream);
-        var tray = new DnuiTray(process, rpc, options.ShutdownTimeout);
+        var tray = new DnuiTray(process, rpc, options.ShutdownTimeout, tracking);
         rpc.AddLocalRpcTarget(new NotificationTarget(tray), new JsonRpcTargetOptions { DisposeOnDisconnect = false });
-        rpc.StartListening();
 
+        // Nothing has been sent yet, so no event can arrive before Configure returns (spec 003 FR-020).
+        try
+        {
+            options.Configure?.Invoke(tray);
+        }
+        catch
+        {
+            tray.Kill();
+            await tray.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
+
+        rpc.StartListening();
         try
         {
             var result = await rpc.InvokeWithParameterObjectAsync<InitializeResult>(
@@ -98,6 +92,7 @@ public sealed class DnuiTray : IAsyncDisposable
                 },
                 cancellationToken).ConfigureAwait(false);
             tray.RuntimeVersion = result.RuntimeVersion;
+            Volatile.Write(ref tray._started, 1);
             return tray;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -115,7 +110,8 @@ public sealed class DnuiTray : IAsyncDisposable
         {
             var exit = await tray.Completion.WaitAsync(TimeSpan.FromSeconds(10), CancellationToken.None).ConfigureAwait(false);
             await tray.DisposeAsync().ConfigureAwait(false);
-            throw new DnuiTrayStartException(exit, ex);
+            var name = Internal.ErrorResults.NameOf(exit.ExitCode);
+            throw new DnuiCommandException(exit, name, $"The Dnui runtime exited with code {exit.ExitCode} ({name}) before the tray started.", ex);
         }
     }
 
@@ -178,6 +174,11 @@ public sealed class DnuiTray : IAsyncDisposable
 
     private async Task<T> CallAsync<T>(string method, object parameters, CancellationToken cancellationToken)
     {
+        if (Volatile.Read(ref _started) == 0 && Volatile.Read(ref _disposed) == 0)
+        {
+            throw new DnuiTrayNotRunningException("The tray hasn't started yet. Attach handlers in Configure; set the menu and icon through DnuiTrayOptions.");
+        }
+
         if (Volatile.Read(ref _disposed) != 0 || _process.HasExited)
         {
             throw new DnuiTrayNotRunningException();
@@ -218,6 +219,7 @@ public sealed class DnuiTray : IAsyncDisposable
     {
         await _process.WaitForExitAsync().ConfigureAwait(false);
         _rpc.Dispose();
+        _tracking.Dispose();
         return new DnuiResult(_process.ExitCode, null);
     }
 

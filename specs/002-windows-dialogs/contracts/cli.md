@@ -75,6 +75,7 @@ shape, and resolve it. `--outcome` is required with `--headless` and invalid wit
 | 16 | `WindowTypeInvalid` | not a non-abstract `DnuiWindow` with a public parameterless constructor |
 | 17 | `WindowFailed` | the window's constructor or code threw (message in `error.message`) |
 | 30 | `DialogUnsupported` | this platform can't show the requested dialog kind |
+| 40 | `RuntimeUnavailable` | library-side only (the `dnui` tool, spec 003): the runtime couldn't be resolved. Never produced by the runtime |
 
 Version mismatch of a window assembly uses 13 `DnuiVersionMismatch`. Usage errors (bad filter
 syntax, `--outcome` problems, unknown options) use 2 `Usage`. All of these resolve an error line;

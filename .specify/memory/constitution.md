@@ -1,3 +1,11 @@
+<!--
+Sync Impact Report
+- Version: 2.3.0 → 2.4.0 (MINOR: new packaging rule, new environment override, release rule)
+- Added: Dnui.Tool / Cmdless.Dnui.Tool (forwarding-only tool); DNUI_PACKAGE_SOURCE override;
+  trusted-publishing release rule
+- Templates: no changes needed
+- Follow-up: none
+-->
 # Dnui Constitution
 
 ## Core Principles
@@ -119,7 +127,9 @@ Getting the runtime onto a machine is a library responsibility.
   usable.
 - Downloaded packages MUST be integrity-checked before extraction is treated as complete.
 - The roots MUST be overridable by consumers in code, and `CmdlessRoot` through
-  `CMDLESS_ROOT`. A code override takes precedence over the environment variable.
+  `CMDLESS_ROOT`. The package source MUST be overridable in code and through
+  `DNUI_PACKAGE_SOURCE` (a NuGet v3 service index URL or a local folder), defaulting to
+  nuget.org. A code override takes precedence over the environment variable.
 
 Rationale: an exact match guarantees that the runtime loading a consumer's app was built
 against the same Dnui and Avalonia binaries as that app.
@@ -138,7 +148,7 @@ Rationale: the reason Dnui exists is cross-platform UI, so parity is part of the
 
 ### V. Lockstep Versioning
 
-- The Dnui library, Dnui.Runtime, and every `Cmdless.Dnui.Runtime.<rid>` package share one
+- The Dnui library, Dnui.Runtime, Dnui.Tool, and every `Cmdless.Dnui.Runtime.<rid>` package share one
   version, `DnuiRuntimeVersion`, and ship together.
 - The public contract consists of the CLI (commands, options, resolved outputs and their
   JSON shapes, error codes, exit codes) and the
@@ -161,8 +171,14 @@ incompatibility rather than a protocol error.
   diagnostic tooling MUST be Debug-only and MUST NOT ship in release runtime packages.
 - CLI: Dnui.Runtime uses System.CommandLine for all argument parsing.
 - Naming: projects, assemblies, and C# namespaces use the `Dnui.*` prefix. Published NuGet
-  package IDs MUST use the `Cmdless.*` prefix (`Cmdless.Dnui`, `Cmdless.Dnui.Runtime.<rid>`).
+  package IDs MUST use the `Cmdless.*` prefix (`Cmdless.Dnui`, `Cmdless.Dnui.Tool`,
+  `Cmdless.Dnui.Runtime.<rid>`).
   The `Cmdless` prefix MUST NOT be added to namespaces or folder names.
+- Tool: Dnui.Tool is published as the .NET tool `Cmdless.Dnui.Tool` (command `dnui`). It
+  MUST only resolve the runtime through the library and forward its arguments unchanged with
+  inherited stdio, returning the runtime's exit code. It MUST NOT define commands, options, or
+  output of its own, except the standard error line when the runtime cannot be resolved. It is
+  framework-dependent and MUST NOT contain the runtime or platform backends.
 - Runtime packaging: Dnui.Runtime itself MUST NOT be published as a package. It is published
   only as one self-contained package per supported RID, named `Cmdless.Dnui.Runtime.<rid>`
   (for example, `Cmdless.Dnui.Runtime.osx-arm64`). Consumers never reference these packages.
@@ -179,6 +195,9 @@ incompatibility rather than a protocol error.
 
 ## Development Workflow & Quality Gates
 
+- Releases are tag-driven and publish to nuget.org only through trusted publishing (no
+  long-lived API keys), behind a maintainer approval. Runtime packages MUST be published and
+  downloadable before the library and the tool are published.
 - Features follow the Spec Kit flow: specify → (clarify) → plan → tasks → implement. Each
   plan MUST include a Constitution Check against the principles above.
 - Every built-in command MUST have contract tests that drive the runtime executable through
@@ -207,4 +226,4 @@ incompatibility rather than a protocol error.
 - Compliance: each feature plan's Constitution Check MUST pass, or list every violation with
   its justification in the plan's complexity tracking. Unjustified violations block merge.
 
-**Version**: 2.3.0 | **Ratified**: 2026-11-08 | **Last Amended**: 2026-11-11
+**Version**: 2.4.0 | **Ratified**: 2026-11-08 | **Last Amended**: 2026-11-11

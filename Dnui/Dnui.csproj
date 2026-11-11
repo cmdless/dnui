@@ -5,9 +5,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>Cmdless.Dnui</PackageId>
-    <Description>Cross-platform UI through a cached, per-platform Avalonia runtime. Show a tray (and more) from any .NET app with no UI framework dependency on your side.</Description>
-    <Authors>Cmdless</Authors>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Description>Cross-platform UI for any .NET app through a cached, per-platform Avalonia runtime: tray icons, native file and folder pickers, and your own Avalonia windows. No UI platform backends on your side; the matching runtime is downloaded on first use.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
@@ -31,6 +32,7 @@
   <ItemGroup>
     <!-- buildTransitive: consumers (and their consumers) get the dnui/ shipping target. -->
     <None Include="build/Cmdless.Dnui.targets" Pack="true" PackagePath="buildTransitive/Cmdless.Dnui.targets" />
+    <None Include="$(DnuiPackageAssets)readme/Dnui.md" Pack="true" PackagePath="README.md" Visible="false" />
   </ItemGroup>
 
 </Project>
