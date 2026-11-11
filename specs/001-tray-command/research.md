@@ -202,8 +202,8 @@ Each entry records a decision, why it was made, and what else was considered.
     handlers driven end-to-end through StreamJsonRpc over in-memory pipes with a fake
     `ITrayHost`. Covers ordering, click notifications, not-initialized and
     already-initialized errors, and the 1,000-click count (SC-007).
-  - `tests/Dnui.Runtime.ContractTests`: start the built runtime executable as a child process
-    with redirected streams. Covers exit codes (every case in FR-003, plus 13, 20, 21),
+  - `tests/Dnui.Runtime.ContractTests`: start the built runtime executable, mostly through the
+    `DnuiTray` client (R12), and with raw process streams for framing and stray-output checks. Covers exit codes (every case in FR-003, plus 13, 20, 21),
     `initialize`/`setItems`/`setIcon` round trips, end-of-file and kill shutdown timing
     (SC-004), and the stray-output flood (SC-005).
   - `tests/Dnui.TestApps`: a class library containing a custom `DnuiCommandApp`, a
@@ -232,3 +232,29 @@ Each entry records a decision, why it was made, and what else was considered.
 - **Rationale**: grouping by tens leaves room for new commands without renumbering.
   System.CommandLine's default parse error code is 1, so it's overridden to 2 to separate
   usage errors from crashes.
+
+## R12. Tray client in the library
+
+- **Decision**: the .NET tray client (`DnuiTray`, see [contracts/tray-client.md](contracts/tray-client.md))
+  is part of this feature and lives in the Dnui library.
+  - It starts the runtime with `System.Diagnostics.Process`: stdin and stdout redirected,
+    stderr not redirected, `UseShellExecute = false`.
+  - It uses StreamJsonRpc with `NewLineDelimitedMessageHandler` over
+    `process.StandardInput.BaseStream` and `process.StandardOutput.BaseStream`.
+  - Notifications go to a private target object that forwards them through a single
+    `Channel`. One consumer loop raises `Opened` and `Clicked` in order, and catches handler
+    exceptions.
+  - `Completion` is `process.WaitForExitAsync()` mapped to `DnuiResult(exitCode, null)`.
+  - `StartAsync` races the initialize call against `rpc.Completion` and process exit. On a lost
+    connection it awaits exit and throws `DnuiTrayStartException`. On cancellation it calls
+    `process.Kill(entireProcessTree: true)`.
+  - `DisposeAsync` disposes the `JsonRpc` (closing stdin), awaits exit up to
+    `ShutdownTimeout`, then kills the process.
+- **Rationale**: the client is the other half of the protocol, and the contract tests need a
+  .NET driver anyway. Writing it once, as product code, gives both the consumer API and the
+  test harness. The user decided the tray client belongs to the tray spec.
+- **Scope cut**: the runtime path is explicit. The shared launcher, runtime download, and
+  `RunAsync` come in a later feature, and `DnuiResult` is introduced now so they can reuse it.
+- **Alternatives**: a test-only client. That duplicates work and leaves consumers with raw
+  JSON-RPC.
+

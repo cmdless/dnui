@@ -17,7 +17,9 @@ redirects stray stdout writes to stderr, and prepares a newline-delimited JSON-R
 connection. After framework initialization it starts listening and drives a single `TrayIcon`
 through `initialize`, `tray/setItems`, and `tray/setIcon`. It reports `tray/opened` (menu opening)
 and `tray/clicked` (item selection), and shows a disabled placeholder when the menu is empty,
-so the behavior is the same on every platform. It shuts down when the input stream ends.
+so the behavior is the same on every platform. It shuts down when the input stream ends. On the caller side, the library gains the `DnuiTray`
+client (start with an explicit runtime path, events, awaitable updates, a `DnuiResult`
+completion, and dispose). It's also the harness the contract tests use.
 
 Every app gets the same output path: the runtime captures stdout before the app exists and
 sends stray console output to stderr. `DnuiApp.Resolve(result, exitCode)` is the only way to
@@ -74,7 +76,7 @@ hundred items
 | I. Small command set | PASS | Only `tray` in this feature |
 | I. Consumers never reference Dnui.Runtime | PASS | Custom apps reference only Dnui; the runtime loads them |
 | II. Library references no platform backends | PASS | Dnui has no Avalonia.Desktop; the Linux DBus probe lives in the runtime (R9) |
-| II. `DnuiApp` / `DnuiCommandApp` extension points, `Resolve`, `Stdio`, minimal public API | PASS | Public types: `DnuiApp`, `DnuiCommandApp`, `DnuiStdio`, `DnuiSession`, `DnuiStdioException`/`DnuiStdioFailure`. The stdio types exist so takeover apps can run their own protocol, and the tray dogfoods them. Everything else is internal (R2, R6) |
+| II. `DnuiApp` / `DnuiCommandApp` extension points, `Resolve`, `Stdio`, minimal public API | PASS | Public types: `DnuiApp`, `DnuiCommandApp`, `DnuiStdio`, `DnuiSession`, `DnuiStdioException`/`DnuiStdioFailure`, plus the tray client set (`DnuiTray`, `DnuiTrayOptions`, `DnuiTrayItem`, `DnuiTrayIcon`, `DnuiResult`, and three exceptions). Each is a type consumers use directly, and the tray client exists so consumers don't have to speak raw JSON-RPC (R12). The stdio types exist so takeover apps can run their own protocol, and the tray dogfoods them. Everything else is internal (R2, R6) |
 | II. New library dependency justified | PASS | StreamJsonRpc justified in R5 |
 | III. Runtime download | N/A | Out of scope |
 | IV. Cross-platform parity, documented gaps, platform adapters | PASS | macOS Dock option and Linux probe are isolated adapters; `tray/opened` uses menu opening, so it's the same on every platform (R8, R9) |
@@ -99,7 +101,8 @@ specs/001-tray-command/
 ├── contracts/
 │   ├── cli.md           # Runtime CLI options, commands, exit codes
 │   ├── tray-protocol.md # JSON-RPC protocol v1
-│   └── app-model.md     # DnuiApp / DnuiCommandApp public API
+│   ├── app-model.md     # DnuiApp / DnuiCommandApp / DnuiStdio public API
+│   └── tray-client.md   # DnuiTray client public API
 ├── checklists/
 │   └── requirements.md
 └── tasks.md             # Phase 2 (/speckit-tasks, not created here)
@@ -117,6 +120,7 @@ Dnui/                              # library, package Cmdless.Dnui
 ├── DnuiCommandApp.cs              # public: sealed OnFrameworkInitializationCompleted
 ├── DnuiStdio.cs                   # public: captured stdio, OpenSession (once), resolve writer
 ├── DnuiSession.cs                 # public: raw Input/Output streams (non-closing Output)
+├── DnuiResult.cs                  # public: record (ExitCode, StdOut), shared by all commands
 ├── Commands/
 │   └── DnuiCommand.cs             # internal: ConfigureBuilder / Run
 ├── Tray/
@@ -128,7 +132,11 @@ Dnui/                              # library, package Cmdless.Dnui
 │   ├── TrayIconDecoder.cs         # path / base64 PNG → icon or error
 │   ├── ITrayHost.cs               # seam
 │   ├── AvaloniaTrayHost.cs        # TrayIcon + NativeMenu implementation
-│   └── RecordingTrayHost.cs       # Debug-only, selected by DNUI_TRAY_HOST=recording
+│   ├── RecordingTrayHost.cs       # Debug-only, selected by DNUI_TRAY_HOST=recording
+│   └── Client/
+│       ├── DnuiTray.cs            # public: process + JsonRpc session, events, updates
+│       ├── DnuiTrayOptions.cs     # public: options, DnuiTrayItem, DnuiTrayIcon
+│       └── DnuiTrayExceptions.cs  # public: start / protocol / not-running exceptions
 └── Properties/AssemblyInfo.cs     # InternalsVisibleTo Dnui.Runtime, Dnui.Tests
 
 Dnui.Runtime/                      # host executable, published per RID (not in this feature)
@@ -160,8 +168,9 @@ Argument parsing, assembly loading, and platform probes live in the runtime (res
 
 Re-checked after writing [data-model.md](data-model.md), [contracts/](contracts/), and
 [quickstart.md](quickstart.md):
-- The public API in [contracts/app-model.md](contracts/app-model.md) is limited to two types
-  and their documented members (II).
+- The public API in [contracts/app-model.md](contracts/app-model.md) and
+  [contracts/tray-client.md](contracts/tray-client.md) is limited to the documented types and
+  members, each with a consumer-facing reason (II).
 - Every exit code and protocol error is documented (V).
 - No platform-specific code appears outside `Platform/` or the tray host (IV).
 

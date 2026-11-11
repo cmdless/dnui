@@ -97,3 +97,20 @@ like `{"error":{"code":"AppTypeInvalid","message":"..."}}` to stdout.
 - `--app-type Dnui.TestApps.EchoSessionApp` with piped stdio: a takeover app that opens a
   session and echoes each input line. The lines come back on stdout. Closing stdin exits 0
   with no extra output.
+
+## 6. .NET tray client
+
+Use the minimal example in [contracts/tray-client.md](contracts/tray-client.md) from a scratch
+console app that references the Dnui project, with `RuntimePath` pointing at the built
+`Dnui.Runtime` executable.
+
+Expected:
+- `StartAsync` completes once the tray is visible.
+- Opening the menu raises `Opened`, and selecting an item raises `Clicked` with its id.
+- Selecting **Quit** disposes the tray. The icon disappears, and `Completion` returns
+  `ExitCode = 0, StdOut = null`.
+- With an invalid `AppType`, `StartAsync` throws `DnuiTrayStartException` with
+  `Result.ExitCode` = 11 or 12.
+- Killing the runtime process from a task manager makes `Completion` return a non-zero exit
+  code without throwing.
+

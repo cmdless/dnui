@@ -11,7 +11,8 @@ the minimal runtime/app-model foundation it needs." (Full input: an initialize r
 also set the icon, tooltip, and items; set-items and set-icon requests; item-clicked and
 icon-clicked notifications; shutdown when the stdio stream ends; the runtime's app-type options
 and the two-tier app model. Out of scope: the daemon helper, runtime download, the window and
-dialog commands, and per-RID packaging.)
+dialog commands, and per-RID packaging.) Later added: the .NET tray client is part of this
+feature.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -137,6 +138,45 @@ applied, the second runs its own logic, and the third exits with the documented 
    instance of the type is created, and the runtime exits with a distinct, documented exit code
    for each case. For the tray command, nothing is written to standard output. Without a
    session command, a single error result is written.
+
+---
+
+### User Story 5 - Drive the tray from .NET with the Dnui client (Priority: P2)
+
+A .NET developer references the Dnui library and shows a tray by calling one start method with
+the runtime's location, icon, tooltip, and items. They get events when the menu opens or an
+item is selected, update the menu and icon with awaitable calls, and end the tray by
+disposing it. They never deal with processes, pipes, or JSON-RPC directly.
+
+**Why this priority**: this is how .NET consumers will actually use the tray. It also drives
+the runtime end to end, which makes it the main harness for the runtime's contract tests.
+It's P2 because the protocol itself (User Stories 1–3) has to exist first.
+
+**Independent Test**: from a test, start a tray through the client against a built runtime,
+check that start completes, update the items, simulate an item selection, and confirm the
+event fires with the right id. Dispose and confirm completion reports exit code 0 with no
+standard output.
+
+**Acceptance Scenarios**:
+
+1. **Given** a path to the runtime executable, **When** the developer starts a tray with an
+   icon, tooltip, and items, **Then** start completes only after the runtime has acknowledged
+   initialize, and the tray is visible.
+2. **Given** a started tray, **When** the end user opens the menu and selects item `open`,
+   **Then** the client raises an opened event and then a clicked event with id `open`.
+3. **Given** a started tray, **When** the developer updates the items with a duplicate id,
+   **Then** the update call fails with an error carrying the protocol error code and details,
+   and the tray keeps running.
+4. **Given** a started tray, **When** the developer disposes it, **Then** the runtime exits,
+   the icon disappears, and completion reports exit code 0 and no standard output.
+5. **Given** a runtime that fails during startup (for example, no tray host, or a bad app
+   type), **When** the developer starts a tray, **Then** start fails with an error that
+   carries the runtime's exit code.
+6. **Given** a started tray, **When** the runtime process dies unexpectedly, **Then**
+   completion reports its non-zero exit code. It doesn't throw, and later update calls fail
+   with a "tray not running" error.
+7. **Given** a start in progress, **When** the developer's cancellation token fires, **Then**
+   the runtime process is killed and start fails with a cancellation error.
 
 ---
 
@@ -285,6 +325,27 @@ applied, the second runs its own logic, and the third exits with the documented 
 - **FR-025**: The protocol (methods, parameters, results, errors, and the protocol version) and
   the exit codes MUST be documented as part of the public contract.
 
+**Tray client (Dnui library)**
+
+- **FR-027**: The library MUST provide a tray client that starts the runtime, given an
+  explicit runtime executable path, with the tray command and optional app assembly and type.
+  It redirects standard input and output, and MUST NOT redirect the error stream.
+- **FR-028**: Starting MUST send initialize with the caller's icon, tooltip, and items, and
+  complete only after a successful response. If the connection ends first, start MUST fail
+  with an error that carries the runtime's exit code (and the standard output, if any).
+- **FR-029**: The client MUST raise an opened event for each `tray/opened` and a clicked event,
+  with the id, for each `tray/clicked`. Events MUST be raised in the order received, and an
+  exception in a handler MUST NOT break the connection.
+- **FR-030**: The client MUST provide awaitable item and icon updates. Protocol errors MUST
+  surface as an error that carries the protocol error code and data.
+- **FR-031**: The client MUST expose a completion result made of the exit code and the standard
+  output (null for tray). A non-zero exit code is a result, not an error.
+- **FR-032**: Disposing the client MUST close the runtime's standard input and wait for it to
+  exit. If it hasn't exited within a bounded time (default 5 seconds), it MUST be killed.
+- **FR-033**: Cancelling during start MUST kill the runtime process and fail start with a
+  cancellation error. After the tray has stopped running, update calls MUST fail with a
+  "not running" error.
+
 **Platforms**
 
 - **FR-026**: All of the above MUST work on Windows, macOS, and Linux desktops that have a
@@ -297,6 +358,10 @@ applied, the second runs its own logic, and the third exits with the documented 
   streams. It owns all tray state.
 - **Resolved result**: the single JSON line a one-shot app writes to standard output, with its
   exit code. Sessions resolve with no result.
+- **Tray client**: the library object that owns one runtime process and its tray session. It
+  exposes events, updates, completion, and disposal.
+- **Run result**: the exit code plus standard output (null when nothing was resolved). It's the
+  same shape for every command, so later one-shot commands return it too.
 - **Stdio / session**: the captured standard streams, owned by the app. They can be claimed
   once as a session, which turns the app from one-shot into a session.
 - **App type**: the application the runtime hosts. Either a command app (runs built-in commands,
@@ -328,6 +393,10 @@ applied, the second runs its own logic, and the third exits with the documented 
   of test runs. Tray failures write nothing to standard output.
 - **SC-007**: Every menu opening and every item selection produces exactly one notification.
   None are lost or duplicated across 1,000 automated interactions.
+- **SC-008**: A .NET developer can show a working tray with a menu and handle clicks in under
+  15 lines of their own code using the client.
+- **SC-009**: Disposing the client leaves no runtime process running in 100% of test runs,
+  including when the runtime ignores end-of-file (it's killed after the timeout).
 
 ## Assumptions
 
@@ -341,8 +410,10 @@ applied, the second runs its own logic, and the third exits with the documented 
   is acceptable. Callers aren't expected to read the error stream.
 - Linux support targets desktop environments that provide a system tray. Others get the
   documented error (FR-026).
-- The runtime is started by the caller directly. How the caller finds or downloads the runtime
-  is covered by a separate feature.
-- Out of scope: the daemon/single-instance helper, runtime download helpers, the window and
-  dialog commands, per-RID packaging, and any caller-side library client (`RunAsync`, the tray
-  session client), which is planned for a later library-client feature.
+- The tray client takes an explicit runtime path in this feature. Finding or downloading the
+  runtime automatically is a later feature, which will add a way to start without a path.
+- Starting with the tray command is deliberate. It's the hardest command (a long-lived
+  session over stdio), so it builds the shared foundation (app model, app resolution, stdio
+  ownership, `Resolve`, exit codes, run result) that the window and dialog commands will reuse.
+- Out of scope: the daemon/single-instance helper, runtime download and the shared launcher,
+  `RunAsync` for one-shot commands, the window and dialog commands, and per-RID packaging.
