@@ -1,3 +1,4 @@
+using Avalonia.Headless;
 using System.Text;
 using System.Text.Json.Nodes;
 using Avalonia;
@@ -17,6 +18,12 @@ public class CustomCommandApp : DnuiCommandApp
 /// <summary>Takes over the app and resolves a single result.</summary>
 public class TakeoverApp : DnuiApp
 {
+    protected override void Configure(AppBuilder builder)
+    {
+        base.Configure(builder);
+        builder.UseHeadless(new AvaloniaHeadlessPlatformOptions());
+    }
+
     public override void OnFrameworkInitializationCompleted()
     {
         Resolve(new JsonObject { ["takeover"] = true });
@@ -27,6 +34,12 @@ public class TakeoverApp : DnuiApp
 /// <summary>Takes over the app and runs its own line-echo protocol on a stdio session.</summary>
 public class EchoSessionApp : DnuiApp
 {
+    protected override void Configure(AppBuilder builder)
+    {
+        base.Configure(builder);
+        builder.UseHeadless(new AvaloniaHeadlessPlatformOptions());
+    }
+
     public override void OnFrameworkInitializationCompleted()
     {
         var session = Stdio.OpenSession();

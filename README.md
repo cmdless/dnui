@@ -98,7 +98,7 @@ Dnui.Runtime [--app-assembly <dll> --app-type <type>] tray [--headless]
 
 - **`tray`** speaks newline-delimited JSON-RPC 2.0 on stdin/stdout
   ([protocol](specs/001-tray-command/contracts/tray-protocol.md)). Closing stdin ends it.
-- **`--headless`** runs everything but the OS tray icon. With `tray/getState`,
+- **`--headless`** runs on Avalonia's headless platform with a simulated tray icon: no display, no Dock icon, no focus changes. With `tray/getState`,
   `tray/simulateOpen`, and `tray/simulateClick` it is how automated tests drive a tray.
 - **Custom apps**: derive from `DnuiCommandApp` to customize the built-in commands, or from
   `DnuiApp` to take over entirely — then either `Resolve(json, exitCode)` once, or claim
