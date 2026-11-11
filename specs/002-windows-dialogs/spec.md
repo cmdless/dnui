@@ -188,8 +188,9 @@ OSes.
   unbundled runtime shows a generic name. That's a documented limitation.
 - **Dialog command given window-only options, or a window command given an app override**: the
   first is a usage error. The second can't happen, because window commands have no such option.
-- **Generic window or app type with no assembly file** (single-file or native ahead-of-time
-  consumer): a clear error before any process starts. The path-based overload works.
+- **Executable copied without its `dnui/` folder** (single-file or native ahead-of-time
+  publish): opening a consumer window or app fails before any process starts, with an error
+  naming the missing `dnui/{assembly}.dll`. The built-in tray and dialogs still work.
 - **Window and app types from the same assembly**: the assembly is loaded once.
 
 ## Requirements *(mandatory)*
@@ -208,17 +209,25 @@ OSes.
   for opening a window, and for starting a tray, returning typed results. These are usable from
   any .NET code, including code inside a window, which then starts a new, unparented process.
 - **FR-003a**: Opening a window MUST be expressible as a generic over the window type
-  (`OpenWindowAsync<TWindow>()`). It MUST be translated to the window's assembly path and type
-  name, with the same signature and behavior on both surfaces: as a host command (new process)
-  and as a window command (a child in the same process).
+  (`OpenWindowAsync<TWindow>()`), with overloads taking a `Type`, or an assembly plus type name.
+  All overloads reduce to an assembly plus a type name, and MUST behave identically on both
+  surfaces: as a host command (new process) and as a window command (a child in the same
+  process, which uses already-loaded types directly).
 - **FR-003b**: Host-command convenience functions MUST also accept the app as a generic (for
   example, `OpenWindowAsync<TWindow, TApp>()`, `StartTrayAsync<TApp>(...)`, and the dialog
   functions), translated to `--app-assembly`/`--app-type`. The app type MUST be a command app.
   Window commands MUST NOT offer an app generic.
-- **FR-003c**: When a generic type's assembly has no file on disk (for example, a consumer
-  published as a single file or with native ahead-of-time compilation), the convenience function
-  MUST fail with a clear error before starting any process, and a path-based overload MUST let
-  the caller point at the assembly explicitly.
+- **FR-003c**: Host-command convenience functions MUST find the assembly file to pass to the
+  runtime in this order: the assembly's own location; `{app folder}/{assembly name}.dll`;
+  `{app folder}/dnui/{assembly name}.dll`. If none exists, they MUST fail before starting any
+  process, with an error that names the expected file and how to fix it.
+- **FR-003d**: Normal usage MUST just work in every publish mode, with no configuration. When a
+  project referencing the Dnui package is published as a single file or with native
+  ahead-of-time compilation, the package's build integration MUST automatically ship the
+  project's IL assembly, its dependency manifest, and its private IL dependencies (including
+  referenced projects) into a `dnui/` folder in the publish output. Assemblies the runtime
+  provides (Dnui, Avalonia) are excluded. Normal publishes are unchanged. A documented property
+  MUST let a project turn this off.
 - **FR-004**: The library MUST define one dialog interface, implemented by the host-command
   functions and by window commands, with the same options and result shapes.
 
@@ -306,6 +315,9 @@ OSes.
 - **SC-007**: The same component, written against the dialog interface, passes the same tests from
   a .NET caller and from window code.
 - **SC-008**: The full contract suite for this feature runs headless in CI on all three OSes.
+- **SC-009**: A single-project app that opens its own window and app types through the generic
+  functions behaves identically when published normally, as a single file, and with native
+  ahead-of-time compilation, with no project changes.
 
 ## Assumptions
 
@@ -318,9 +330,17 @@ OSes.
 - Window commands may load additional window assemblies into the window's process. Only the
   app is fixed per process. A window that needs a different app is opened through a host
   command (a new process).
-- Generic convenience functions need the type's assembly as a file. Consumers published as a
-  single file or with native ahead-of-time compilation must ship window and app assemblies as
-  separate files and use the path-based overloads.
+- Window and app code always runs in the runtime process, which loads IL. Under native
+  ahead-of-time compilation, the consumer's executable has no IL. The automatic `dnui/` folder
+  (FR-003d) supplies it, so one project works in every publish mode.
+- In a single-project native AOT app, the UI types (and the Avalonia code they reference) are
+  also compiled into the executable, though never run there. Expect a larger binary and possibly
+  publish-time trimming warnings. Keeping windows and apps in a separate library opened by name
+  is an optional size optimization, not a requirement.
+- Avalonia and Dnui assemblies come from the runtime, not the consumer's `dnui/` folder.
+  Lockstep versioning (constitution V) keeps them compatible.
+- A source generator (build-time checks, typed names without a reference) is a later, optional
+  extension, shipped inside the same package.
 - Error and exit codes continue spec 001's scheme: new runtime exit codes stay below 64.
 - Out of scope, for later extensions: message box and other dialog kinds, window-author protocols
   and window sessions, parenting across processes, shared named hosts, app single-instance, OS
