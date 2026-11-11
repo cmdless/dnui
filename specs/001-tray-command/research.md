@@ -215,11 +215,20 @@ Each entry records a decision, why it was made, and what else was considered.
     has `EchoSessionApp`, a takeover app that opens a session and echoes lines, and
     `EagerSessionCommandApp`, a command app that claims stdio in its constructor to trigger
     exit 22. The contract tests load it with `--app-assembly`.
-- **Desktop in CI**: contract tests set `DNUI_TRAY_HOST=recording`. Only Debug builds honor
-  it. It swaps `AvaloniaTrayHost` for a recording host that writes state snapshots to stderr
-  as JSON lines. CI doesn't need a real tray host, but still exercises the full process,
-  Avalonia startup, and dispatcher path. Linux CI runs under `xvfb-run`. The real tray on each
-  OS is checked manually with [quickstart.md](quickstart.md).
+- **Desktop in CI**: contract tests run `tray --headless`, a public, always-available option
+  (FR-047) that swaps `AvaloniaTrayHost` for `HeadlessTrayHost`. That host keeps the same
+  `TrayState`, but shows nothing. Tests assert with the public `tray/getState`, and drive
+  events with `tray/simulateOpen` and `tray/simulateClick` (FR-048–FR-049). These are real
+  protocol features, not test hooks, so the suite runs against Release packages too (SC-013),
+  and consumers can use the same approach for their own apps. CI still exercises the full
+  process, Avalonia startup, and dispatcher path. Linux CI runs under `xvfb-run`. The real tray
+  on each OS is checked manually with [quickstart.md](quickstart.md).
+- **Simulation semantics**: `simulateOpen` and `simulateClick` call the same `TrayNotifier`
+  path that host events use, and wait until the notification has been written before
+  responding. `simulateClick` checks the target against the current state using the user's
+  rules (enabled leaf only), else -32012 `InvalidSimulation`. Both work in headless and real
+  mode. The earlier Debug-only `DNUI_TRAY_HOST` and `$/dnui/test/*` design was dropped at the
+  user's request (2026-11-11), because always-on public features are simpler and more useful.
 - **Alternatives**: Avalonia.Headless. It has no tray platform implementation, so it can't
   replace the host seam. Purely manual tray testing fails the constitution's contract-test
   gate.

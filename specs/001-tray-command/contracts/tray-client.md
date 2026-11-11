@@ -20,6 +20,7 @@ public sealed class DnuiTrayOptions
     public string? Tooltip { get; init; }
     public IReadOnlyList<DnuiTrayItem> Items { get; init; } = [];
     public TimeSpan ShutdownTimeout { get; init; } = TimeSpan.FromSeconds(5);
+    public bool Headless { get; init; }                 // tray --headless: no OS tray icon
 }
 
 public sealed record DnuiTrayItem(string Id, string Text)
@@ -58,12 +59,20 @@ public sealed class DnuiTray : IAsyncDisposable
     public Task SetItemsAsync(IReadOnlyList<DnuiTrayItem> items, CancellationToken ct = default);
     public Task SetIconAsync(DnuiTrayIcon icon, string? tooltip = null, CancellationToken ct = default);
 
+    // Inspection and simulation (tray/getState, tray/simulateOpen, tray/simulateClick).
+    // Always available; intended for consumers' automated tests and diagnostics.
+    public Task<DnuiTrayState> GetStateAsync(CancellationToken ct = default);
+    public Task SimulateOpenAsync(CancellationToken ct = default);   // Opened is raised before this completes
+    public Task SimulateClickAsync(string id, CancellationToken ct = default);   // -32012 → DnuiTrayProtocolException
+
     // Completes when the runtime exits, for any reason. Never faults for a non-zero exit code.
     public Task<DnuiResult> Completion { get; }
 
     // Closes the runtime's stdin, awaits exit up to ShutdownTimeout, then kills it.
     public ValueTask DisposeAsync();
 }
+
+public sealed record DnuiTrayState(bool Visible, bool HasIcon, string? Tooltip, IReadOnlyList<DnuiTrayItem> Items);
 
 public sealed class DnuiTrayStartException : Exception
 {
@@ -83,7 +92,7 @@ public sealed class DnuiTrayNotRunningException : InvalidOperationException { }
 
 - **Resolve**: `DnuiRuntime.ResolveAsync(options.Runtime)` runs first. On a warm cache it
   makes no network requests.
-- **Launch**: `<resolved runtime> [--app-assembly A --app-type T] tray`, with stdin and stdout
+- **Launch**: `<resolved runtime> [--app-assembly A --app-type T] tray [--headless]`, with stdin and stdout
   redirected and stderr inherited (never redirected, see [cli.md](cli.md)).
 - **Framing**: newline-delimited JSON-RPC over the process streams. Notification handlers are
   registered before listening starts, so none are missed.

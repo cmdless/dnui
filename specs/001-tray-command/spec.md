@@ -390,6 +390,22 @@ feed unreachable, and check that it succeeds from the cache.
   cancellation error. After the tray has stopped running, update calls MUST fail with a
   "not running" error.
 
+**Headless mode, state, and simulation (always available)**
+
+- **FR-047**: The tray command MUST accept a `--headless` option. In headless mode it does
+  everything except show a real OS tray icon, needs no tray host, and skips the tray-host
+  check (FR-026). The client MUST expose the same option.
+- **FR-048**: The protocol MUST provide a `tray/getState` request that returns what the tray is
+  currently showing: visible, has-icon, tooltip, and the item tree (without the placeholder).
+- **FR-049**: The protocol MUST provide `tray/simulateOpen` and `tray/simulateClick { id }`
+  requests. They send exactly the notifications that a real menu opening or item selection
+  would, through the same path, before responding. Simulating a click on an unknown id, a
+  disabled item, a separator, or a submenu parent MUST fail with an invalid-simulation error
+  that gives the reason.
+- **FR-050**: These features MUST be available in every build, including released runtime
+  packages, and MUST be documented as part of the protocol contract. The client MUST provide
+  matching methods.
+
 **Runtime acquisition (Dnui library)**
 
 - **FR-034**: The library MUST resolve the runtime automatically. The developer MUST NOT be
@@ -435,7 +451,7 @@ feed unreachable, and check that it succeeds from the cache.
 
 - **FR-026**: All of the above MUST work on Windows, macOS, and Linux desktops that have a
   system tray. If a Linux environment has no tray host, the runtime MUST report it with a
-  distinct, documented error.
+  distinct, documented error, except in headless mode (FR-047).
 
 ### Key Entities
 
@@ -492,6 +508,8 @@ feed unreachable, and check that it succeeds from the cache.
   requests.
 - **SC-012**: With 10 processes resolving at once on an empty cache, the package is downloaded
   exactly once and all 10 get a working runtime, in 100% of test runs.
+- **SC-013**: The full contract test suite runs against Release-built runtime packages, in
+  headless mode, on all three OSes, with no build-specific test hooks.
 
 ## Assumptions
 

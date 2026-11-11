@@ -56,6 +56,42 @@ Replaces the whole menu. `[]` shows the placeholder item (see [data-model.md](..
 
 If `tooltip` is omitted, the current tooltip stays. Result: `{}`.
 
+### `tray/getState`
+
+```json
+{"jsonrpc":"2.0","id":4,"method":"tray/getState","params":{}}
+```
+
+Result: what the tray is showing right now.
+
+```json
+{"visible":true,"hasIcon":true,"tooltip":"My App","items":[{"id":"open","text":"Open","enabled":true,"checked":null,"separator":false,"items":null}]}
+```
+
+`items` is the caller's last applied list, not the placeholder. The icon image isn't returned.
+
+### `tray/simulateOpen`
+
+```json
+{"jsonrpc":"2.0","id":5,"method":"tray/simulateOpen","params":{}}
+```
+
+Sends `tray/opened` exactly as a real menu opening would, then responds `{}`. The notification
+is always written before the response.
+
+### `tray/simulateClick`
+
+```json
+{"jsonrpc":"2.0","id":6,"method":"tray/simulateClick","params":{"id":"open"}}
+```
+
+Sends `tray/clicked {"id":"open"}` exactly as a real selection would, then responds `{}`. It
+follows the same rules as a user: an unknown id, a disabled item, a separator, or a submenu
+parent → -32012. While the placeholder is shown, there's nothing selectable.
+
+All three methods require `initialize` first (-32001), and work the same with or without
+`--headless`.
+
 ### Menu item and icon shapes
 
 See [data-model.md](../data-model.md) (MenuItem, Icon).
@@ -89,6 +125,7 @@ found, -32602 invalid params) apply. Application errors:
 | -32003 | ProtocolVersionMismatch | `initialize.protocolVersion` ≠ 1 | `{"requested":n,"supported":[1]}` |
 | -32010 | InvalidItems | validation failure (data-model rules) | `{"path":"items[1]","id":"x","reason":"duplicate-id"}` |
 | -32011 | InvalidIcon | icon unreadable, ambiguous, or undecodable | `{"reason":"..."}` |
+| -32012 | InvalidSimulation | `tray/simulateClick` target is unknown, disabled, a separator, or a submenu parent | `{"id":"x","reason":"unknown" \| "disabled" \| "separator" \| "parent"}` |
 
 A malformed message never crashes the runtime. If a request id can be recovered, an error
 response is sent.

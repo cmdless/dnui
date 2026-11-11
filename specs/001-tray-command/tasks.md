@@ -41,7 +41,7 @@ Shared versions come from `Directory.Build.props` (`DnuiRuntimeVersion`, `Versio
 - [ ] T003 [P] Create xUnit v3 test project tests/Dnui.Runtime.ContractTests/Dnui.Runtime.ContractTests.csproj referencing Dnui/Dnui.csproj and Dnui.Runtime/Dnui.Runtime.csproj (`ReferenceOutputAssembly="false"`, so the runtime builds first). Embed the runtime's output path as `AssemblyMetadata("DnuiRuntimeExe", "<path to Dnui.Runtime[.exe]>")`, then add the project to Dnui.slnx
 - [ ] T004 [P] Create class library tests/Dnui.TestApps/Dnui.TestApps.csproj (net10.0) referencing Dnui/Dnui.csproj, add it to Dnui.slnx, and make tests/Dnui.Runtime.ContractTests reference it with `ReferenceOutputAssembly="false"` so it builds first
 - [ ] T005 [P] Delete Dnui.Runtime/MainWindow.axaml and Dnui.Runtime/MainWindow.axaml.cs (the window command is future work)
-- [ ] T006 [P] Create Dnui/Properties/AssemblyInfo.cs with `InternalsVisibleTo("Dnui.Runtime")`, `InternalsVisibleTo("Dnui.Tests")`, `InternalsVisibleTo("Dnui.Runtime.ContractTests")`
+- [ ] T006 [P] Create Dnui/Properties/AssemblyInfo.cs with `InternalsVisibleTo("Dnui.Runtime")`, `InternalsVisibleTo("Dnui.Tests")`. Contract tests use only public API
 - [ ] T007 [P] Create .github/workflows/ci.yml: matrix `windows-latest`, `macos-latest`, `ubuntu-latest`. Set up .NET 10, `dotnet build Dnui.slnx -c Debug`, and `dotnet test Dnui.slnx -c Debug`. On Ubuntu, wrap the test step in `xvfb-run -a`
 
 ---
@@ -69,7 +69,7 @@ research R1–R4, R6, R11)
   - a non-null result while a session is open is dropped (and a warning is written to the test's stderr capture), but the exit code is kept
   - `Resolve` before the lifetime starts records a pending resolution instead of posting to the dispatcher
 - [ ] T011 [P] Write tests/Dnui.Runtime.ContractTests/Support/RuntimeProcess.cs:
-  - starts the runtime executable from `AssemblyMetadata("DnuiRuntimeExe")` with given args and env (default `DNUI_TRAY_HOST=recording`)
+  - starts the runtime executable from `AssemblyMetadata("DnuiRuntimeExe")` with given args (tray tests pass `tray --headless`)
   - redirects stdin and stdout, and redirects stderr only to **drain** it into a buffer on a background task
   - exposes `StdOutLines` (async enumerable), `WriteLineAsync`, `CloseStdin()`, and `WaitForExitAsync(timeout)` → exit code
 - [ ] T012 [P] Write tests/Dnui.Runtime.ContractTests/CliTests.cs. Each of these exits with 2:
@@ -172,9 +172,14 @@ see the icon and menu, open the menu (`tray/opened`), click an item (`tray/click
   - `ItemClicked("open")` → `tray/clicked {"id":"open"}`
   - 1,000 interleaved events arrive in order with no loss or duplicates (SC-007)
   - an empty item list produces the placeholder (`id ""`, text `No items`, disabled) in the applied `TrayState`
+  - `tray/simulateOpen` → `tray/opened` is written **before** its response, and `tray/simulateClick {"id":"open"}` → `tray/clicked` before its response
+  - `simulateClick` on an unknown id, a disabled item, a separator, or a submenu parent → -32012 with `reason` `unknown`, `disabled`, `separator`, or `parent`
+  - `tray/getState` returns `{visible, hasIcon, tooltip, items}` with the caller's items (never the placeholder)
+  - all three methods return -32001 before initialize
 - [ ] T032 [P] [US1] Write tests/Dnui.Runtime.ContractTests/TrayInitializeContractTests.cs:
-  - start `tray` with RuntimeProcess (recording host), send a raw newline-delimited `initialize` line, and assert one JSON-RPC response line with `result.runtimeVersion`
-  - assert the recording host's stderr snapshot shows the icon, tooltip, and items
+  - start `tray --headless` with RuntimeProcess, send a raw newline-delimited `initialize` line, and assert one JSON-RPC response line with `result.runtimeVersion`
+  - `tray/getState` shows `visible:true`, `hasIcon:true`, the tooltip, and the items
+  - `tray/simulateOpen` and `tray/simulateClick` produce the notifications on stdout before their responses
   - assert no non-JSON-RPC line ever appears on stdout
 
 ### Implementation for User Story 1
@@ -185,7 +190,7 @@ see the icon and menu, open the menu (`tray/opened`), click an item (`tray/click
   - `TrayIconSource { string? Path; string? Png }`
   - `SetItemsParams { List<TrayMenuItem> Items }` and `SetIconParams { TrayIconSource Icon; string? Tooltip }`
   - `ClickedNotification { string Id }`
-- [ ] T034 [P] [US1] Create Dnui/Tray/TrayErrorCodes.cs: `NotInitialized = -32001`, `AlreadyInitialized = -32002`, `ProtocolVersionMismatch = -32003`, `InvalidItems = -32010`, `InvalidIcon = -32011`, plus a `Throw(code, message, object? data)` helper that throws `LocalRpcException { ErrorCode, ErrorData }`
+- [ ] T034 [P] [US1] Create Dnui/Tray/TrayErrorCodes.cs: `NotInitialized = -32001`, `AlreadyInitialized = -32002`, `ProtocolVersionMismatch = -32003`, `InvalidItems = -32010`, `InvalidIcon = -32011`, `InvalidSimulation = -32012`, plus a `Throw(code, message, object? data)` helper that throws `LocalRpcException { ErrorCode, ErrorData }`
 - [ ] T035 [P] [US1] Create Dnui/Tray/TrayMenuValidator.cs: validates the whole tree before anything is applied, returning the first failure as `(path, id?, reason: "missing-id" | "missing-text" | "duplicate-id")` per [data-model.md](data-model.md)
 - [ ] T036 [P] [US1] Create Dnui/Tray/TrayIconDecoder.cs: from a `TrayIconSource`, requires exactly one of `path`/`png`, reads the file (relative paths resolved against `Environment.CurrentDirectory`) or decodes base64, then creates `new Bitmap(stream)` and `new WindowIcon(bitmap)`. Must run on the UI thread. Any failure → `InvalidIcon` with `{"reason":"..."}`
 - [ ] T037 [P] [US1] Create Dnui/Tray/ITrayHost.cs: `internal interface ITrayHost : IDisposable { void Apply(TrayState state); event Action? MenuOpened; event Action<string>? ItemClicked; }` and `internal sealed record TrayState(WindowIcon? Icon, string? Tooltip, IReadOnlyList<TrayMenuItem> Items)`, where the host shows the icon only when `Icon != null`
@@ -197,14 +202,19 @@ see the icon and menu, open the menu (`tray/opened`), click an item (`tray/click
     - subscribes `NativeMenu.Opening` → `MenuOpened`
   - an empty list → a single `NativeMenuItem { Header = "No items", IsEnabled = false }`, whose click reports id `""`
   - `Dispose` hides and removes the icon
-- [ ] T039 [P] [US1] Create Dnui/Tray/RecordingTrayHost.cs inside `#if DEBUG`: writes one stderr line `{"dnuiTrayState":{...}}` per `Apply`, and exposes `internal void SimulateOpened()` / `SimulateClick(string id)`
+- [ ] T039 [P] [US1] Create Dnui/Tray/HeadlessTrayHost.cs (always compiled, used by `tray --headless`): an `ITrayHost` that keeps the last applied `TrayState` and shows nothing. It raises no events of its own; simulation goes through `TrayProtocolTarget`
 - [ ] T040 [US1] Create Dnui/Tray/TrayNotifier.cs: an unbounded single-reader `Channel` of notifications, drained by one loop calling `await rpc.NotifyAsync("tray/opened", new {})` or `NotifyAsync("tray/clicked", new { id })` in order. It's fed from host events on the UI thread without blocking (research R7)
 - [ ] T041 [US1] Create Dnui/Tray/TrayProtocolTarget.cs: `[JsonRpcMethod("initialize")]` with the AwaitingInitialize → Running state machine per [data-model.md](data-model.md) Session lifecycle:
   - check the version
   - validate items and decode the icon **inside one `Dispatcher.UIThread.InvokeAsync`**, then apply the state and return `InitializeResult(DnuiBuildInfo.RuntimeVersion)`
   - every other `tray/*` method checks the state first (-32001)
 
-  Also add a Debug-only `[JsonRpcMethod("$/dnui/test/open")]` and `[JsonRpcMethod("$/dnui/test/click")]`, which call the `RecordingTrayHost` simulate methods (depends on T033–T040)
+  Also add these, available in every build, per [contracts/tray-protocol.md](contracts/tray-protocol.md) (depends on T033–T040):
+  - `[JsonRpcMethod("tray/getState")]`: returns `{visible, hasIcon, tooltip, items}` from the current state (caller items, never the placeholder)
+  - `[JsonRpcMethod("tray/simulateOpen")]`: awaits `TrayNotifier` writing `tray/opened`, then returns `{}`
+  - `[JsonRpcMethod("tray/simulateClick")]`: finds the id in the current items, allowing only enabled, non-separator leaves (else -32012 with `reason` `unknown`, `disabled`, `separator`, or `parent`; while the placeholder is shown nothing is selectable), awaits `TrayNotifier` writing `tray/clicked`, then returns `{}`
+
+  `TrayNotifier` (T040) needs an `EnqueueAndWaitAsync` that completes once the notification has been flushed.
 - [ ] T042 [US1] Create Dnui/Tray/TrayCommand.cs (`IsSession = true`, `HideDockIcon = true`):
   - `Prepare`:
     - `app.Stdio.OpenSession()`, mapping `DnuiStdioException` to 20 (`NotRedirected`) or 22 (`AlreadyClaimed`)
@@ -213,12 +223,12 @@ see the icon and menu, open the menu (`tray/opened`), click an item (`tray/click
     - no `StartListening` yet
   - `Run`:
     - `lifetime.ShutdownMode = OnExplicitShutdown`
-    - create the host (`RecordingTrayHost` when Debug and `DNUI_TRAY_HOST=recording`, else `AvaloniaTrayHost`)
+    - create the host (`HeadlessTrayHost` when the command was parsed with `--headless`, else `AvaloniaTrayHost`)
     - `rpc.StartListening()`
     - `rpc.Completion.ContinueWith(_ => app.ResolveInternal(null, 0))`, disposing the host on shutdown
 
   (depends on T041)
-- [ ] T043 [US1] Register `tray` in Dnui.Runtime/Cli/RuntimeCommandLine.cs as a session command, and make Program.cs create `new TrayCommand()` for it (depends on T042)
+- [ ] T043 [US1] Register `tray` in Dnui.Runtime/Cli/RuntimeCommandLine.cs as a session command with a `--headless` option, and make Program.cs create `new TrayCommand(headless)` for it (depends on T042)
 
 **Checkpoint**: US1 tests pass, and quickstart §2 (initialize, opened, clicked) works manually on the dev machine.
 
@@ -312,7 +322,7 @@ icon is unchanged.
   - `tooltip` omitted → the previous tooltip is kept
   - both `path` and `png` → -32011, with the previous icon kept
   - an unreadable path → -32011
-- [ ] T060 [P] [US2] Write tests/Dnui.Runtime.ContractTests/TrayUpdateContractTests.cs: raw `tray/setItems` and `tray/setIcon` round trips against the recording host, asserting the snapshot after each response, and the error codes for the invalid cases
+- [ ] T060 [P] [US2] Write tests/Dnui.Runtime.ContractTests/TrayUpdateContractTests.cs: raw `tray/setItems` and `tray/setIcon` round trips against `tray --headless`, asserting `tray/getState` after each response, and the error codes for the invalid cases
 
 ### Implementation for User Story 2
 
@@ -336,13 +346,13 @@ harness side), and the runtime exits within 2 s.
 - [ ] T063 [P] [US3] Write tests/Dnui.Runtime.ContractTests/TrayLifecycleContractTests.cs:
   - after initialize, `CloseStdin()` → exit code 0 within 2 s, and no stdout output after the last response (SC-004)
   - abruptly disposing both pipe ends without closing gracefully → the process exits within 2 s
-  - a stdout write failure (dispose the stdout reader, then trigger a notification through `$/dnui/test/click`) → the process exits
+  - a stdout write failure (dispose the stdout reader, then send `tray/simulateClick`) → the process exits
 - [ ] T064 [P] [US3] Write tests/Dnui.Tests/Tray/TrayCommandPrepareTests.cs: `Prepare` with a non-redirected `DnuiStdio` returns 20, and with an already-claimed one returns 22. Neither writes to stdout
 
 ### Implementation for User Story 3
 
 - [ ] T065 [US3] In Dnui/Tray/TrayCommand.cs, also handle `rpc.Disconnected` (covers write failures), make shutdown idempotent with the completion path, and dispose the tray host and `JsonRpc` inside the lifetime's `Exit` handler so the icon is removed before the process ends
-- [ ] T066 [P] [US3] Create Dnui.Runtime/Platform/LinuxTrayHostProbe.cs using `Tmds.DBus.Protocol` (already transitive through Avalonia.Desktop): connect to the session bus and call `org.freedesktop.DBus.NameHasOwner("org.kde.StatusNotifierWatcher")`. No bus, or false → unavailable. Skipped when `DNUI_TRAY_HOST=recording`
+- [ ] T066 [P] [US3] Create Dnui.Runtime/Platform/LinuxTrayHostProbe.cs using `Tmds.DBus.Protocol` (already transitive through Avalonia.Desktop): connect to the session bus and call `org.freedesktop.DBus.NameHasOwner("org.kde.StatusNotifierWatcher")`. No bus, or false → unavailable. Skipped when `tray --headless`
 - [ ] T067 [US3] Call `LinuxTrayHostProbe` from Dnui.Runtime/Program.cs for the `tray` command on Linux after `Prepare`, returning 21 with no stdout output when no tray host exists (depends on T066)
 
 **Checkpoint**: US1–US3 pass, and no orphaned tray icons remain.
@@ -359,9 +369,11 @@ feed), update items, simulate a click, receive the event, dispose → `DnuiResul
 
 ### Tests for User Story 5
 
-- [ ] T068 [P] [US5] Write tests/Dnui.Runtime.ContractTests/TrayClientTests.cs, each using `DnuiTray` with `Runtime = new() { RuntimePath = <built runtime> }` and `DNUI_TRAY_HOST=recording` in the child environment:
+- [ ] T068 [P] [US5] Write tests/Dnui.Runtime.ContractTests/TrayClientTests.cs, each using `DnuiTray` with `Runtime = new() { RuntimePath = <built runtime> }` and `Headless = true`, through public API only:
   - `StartAsync` completes after initialize, and `RuntimeVersion` matches
-  - a simulated open and click (through the internal `Rpc` and `$/dnui/test/*`) raise `Opened`, then `Clicked("open")`
+  - `SimulateOpenAsync()` then `SimulateClickAsync("open")` raise `Opened`, then `Clicked("open")`, each before its call completes
+  - `GetStateAsync()` returns a `DnuiTrayState` matching the last `SetItemsAsync`
+  - `SimulateClickAsync` on a disabled item throws `DnuiTrayProtocolException` with `Code = -32012`
   - a duplicate-id `SetItemsAsync` throws `DnuiTrayProtocolException` with `Code = -32010`, and the tray keeps running
   - `DisposeAsync` → `Completion` returns `DnuiResult(0, null)` within 2 s
   - killing the process → `Completion` returns a non-zero code without throwing, and later `SetItemsAsync` throws `DnuiTrayNotRunningException`
@@ -371,18 +383,18 @@ feed), update items, simulate a click, receive the event, dispose → `DnuiResul
 
 ### Implementation for User Story 5
 
-- [ ] T070 [P] [US5] Create Dnui/Tray/Client/DnuiTrayOptions.cs per [contracts/tray-client.md](contracts/tray-client.md): `DnuiTrayOptions` (`Runtime`, `AppAssembly`, `AppType`, `Icon`, `Tooltip`, `Items`, `ShutdownTimeout` = 5 s), `DnuiTrayItem` (record with `Enabled = true`, `Checked`, `Items`, and a static `Separator`), and `DnuiTrayIcon` (`FromFile`, `FromPng`)
+- [ ] T070 [P] [US5] Create Dnui/Tray/Client/DnuiTrayOptions.cs per [contracts/tray-client.md](contracts/tray-client.md): `DnuiTrayOptions` (`Runtime`, `AppAssembly`, `AppType`, `Icon`, `Tooltip`, `Items`, `ShutdownTimeout` = 5 s, `Headless`), `DnuiTrayState` (record `Visible`, `HasIcon`, `Tooltip`, `Items`), `DnuiTrayItem` (record with `Enabled = true`, `Checked`, `Items`, and a static `Separator`), and `DnuiTrayIcon` (`FromFile`, `FromPng`)
 - [ ] T071 [P] [US5] Create Dnui/Tray/Client/DnuiTrayExceptions.cs: `DnuiTrayStartException(DnuiResult Result)`, `DnuiTrayProtocolException(int Code, JsonElement? Data)`, and `DnuiTrayNotRunningException : InvalidOperationException`
 - [ ] T072 [US5] Create Dnui/Tray/Client/DnuiTray.cs:
   - `StartAsync`:
     1. Resolve the runtime with `DnuiRuntime.ResolveAsync(options.Runtime)`.
-    2. Start a `Process` (`UseShellExecute=false`, stdin and stdout redirected, **stderr not redirected**) with args `[--app-assembly A --app-type T] tray`.
+    2. Start a `Process` (`UseShellExecute=false`, stdin and stdout redirected, **stderr not redirected**) with args `[--app-assembly A --app-type T] tray [--headless]`.
     3. Create `JsonRpc` with `NewLineDelimitedMessageHandler` over the process streams, adding a private notification target **before** `StartListening`. It forwards to a `Channel` drained by one loop that raises `Opened` and `Clicked`, catching handler exceptions into `UnhandledHandlerException`.
     4. Map the options to `initialize` and race it against process exit. A lost connection → await exit → `DnuiTrayStartException(new DnuiResult(code, null))`. Cancellation → `Kill(entireProcessTree: true)` → rethrow.
   - `SetItemsAsync` and `SetIconAsync`: map `RemoteInvocationException` to `DnuiTrayProtocolException`, and after exit to `DnuiTrayNotRunningException`.
   - `Completion = WaitForExitAsync` → `DnuiResult(ExitCode, null)`.
   - `DisposeAsync` is idempotent: dispose the `JsonRpc` (closing stdin), await exit up to `ShutdownTimeout`, then kill.
-  - `internal JsonRpc Rpc` for tests.
+  - `GetStateAsync`, `SimulateOpenAsync`, and `SimulateClickAsync`: thin wrappers over `tray/getState`, `tray/simulateOpen`, and `tray/simulateClick`, with the same exception mapping. `SimulateOpenAsync` and `SimulateClickAsync` complete only after the matching event handlers have been invoked (the response arrives after the notification).
 
   (depends on T070, T071)
 
@@ -445,7 +457,7 @@ an eager session claim.
 - [ ] T081 [P] Add tests/Dnui.Runtime.ContractTests/TimingTests.cs: tray visible (initialize response) within 2 s of process start (SC-002), and a warm-cache `ResolveAsync` under 100 ms with no source access (SC-011)
 - [ ] T082 Add a public-API guard test, tests/Dnui.Tests/PublicApiTests.cs, that lists all public types in the Dnui assembly and asserts the set equals the contracts' list (constitution II minimal surface)
 - [ ] T083 Run [quickstart.md](quickstart.md) §1–§7 on Windows, macOS, and Linux with a real tray. Record whether `tray/opened` fires and whether the disabled placeholder can be selected on each OS in [contracts/tray-protocol.md](contracts/tray-protocol.md), and fix any platform gap (FR-023 requires `tray/opened` everywhere)
-- [ ] T084 Final check: `dotnet build Dnui.slnx` with 0 warnings, `dotnet test` green on all three CI runners, and all six `Cmdless.Dnui.Runtime.<rid>` packages produced by the `pack` job
+- [ ] T084 Final check: `dotnet build Dnui.slnx` with 0 warnings, `dotnet test` green on all three CI runners in Debug **and** with the contract tests pointed at a Release-packed runtime (SC-013), and all six `Cmdless.Dnui.Runtime.<rid>` packages produced by the `pack` job
 
 ---
 
@@ -526,8 +538,9 @@ checkpoint where its tests pass on their own.
 ## Notes
 
 - `[P]` means different files and no dependency on unfinished tasks.
-- Debug-only test hooks (`DNUI_TRAY_HOST=recording`, `$/dnui/test/*`) must be inside
-  `#if DEBUG` and absent from Release runtime packages (plan Complexity Tracking).
+- There are no build-specific test hooks. Tests use the public `tray --headless`,
+  `tray/getState`, and `tray/simulate*` (FR-047–FR-050), which behave the same in Release
+  packages.
 - The library must never reference Avalonia.Desktop or Avalonia.Native. Platform options
   (macOS `ShowInDock`) are applied by the runtime from the `DnuiCommand.HideDockIcon` hint
   (T018, T025).

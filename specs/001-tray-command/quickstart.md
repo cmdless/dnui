@@ -21,8 +21,8 @@ dotnet test Dnui.slnx
 ```
 
 Expected: build passes with 0 warnings, and all unit and contract tests pass. On Linux CI, run
-the tests under `xvfb-run`. Contract tests use `DNUI_TRAY_HOST=recording` and don't need a real
-tray.
+the tests under `xvfb-run`. Contract tests use `tray --headless` with `tray/getState` and `tray/simulate*`,
+so they don't need a real tray, and they also pass against Release builds.
 
 ## 2. Manual: real tray round trip (each OS)
 
@@ -135,4 +135,28 @@ Expected:
 - Delete `.dnui-complete`, then run again: the folder is replaced with a fresh copy.
 - `CMDLESS_ROOT=/tmp/other dotnet run ...` without `CmdlessRoot` in code: the cache goes under
   `/tmp/other/dotnet`.
+
+## 8. Headless mode and simulation
+
+```bash
+mkfifo /tmp/dnui-h
+dotnet run --project Dnui.Runtime -- tray --headless < /tmp/dnui-h &
+exec 4> /tmp/dnui-h
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":1,"items":[{"id":"open","text":"Open"},{"id":"off","text":"Off","enabled":false}]}}' >&4
+echo '{"jsonrpc":"2.0","id":2,"method":"tray/simulateOpen","params":{}}' >&4
+echo '{"jsonrpc":"2.0","id":3,"method":"tray/simulateClick","params":{"id":"open"}}' >&4
+echo '{"jsonrpc":"2.0","id":4,"method":"tray/simulateClick","params":{"id":"off"}}' >&4
+echo '{"jsonrpc":"2.0","id":5,"method":"tray/getState","params":{}}' >&4
+exec 4>&-
+```
+
+Expected, in order:
+- the `initialize` result
+- `tray/opened`, then response 2
+- `tray/clicked {"id":"open"}`, then response 3
+- error -32012 with reason `disabled`
+- the state: `visible:false`, since there's no icon; the two items
+- exit 0
+
+No OS tray icon appears at any point, even on Linux without a tray host.
 

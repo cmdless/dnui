@@ -50,7 +50,8 @@ protocol. Decisions are in
 
 **Testing**: xUnit v3 (`xunit.v3`, `xunit.runner.visualstudio`, `Microsoft.NET.Test.Sdk`):
 - unit tests with a fake tray host over in-memory pipes
-- process-level contract tests against the built runtime, with a Debug-only recording tray host
+- process-level contract tests against the built runtime in `tray --headless` mode, using the
+  public `tray/getState` and `tray/simulate*` methods
 
 **Target Platform**: Windows, macOS, and Linux desktops (x64 and arm64). Linux needs a
 StatusNotifierItem tray host.
@@ -94,7 +95,7 @@ hundred items
 | Workflow: app resolution test matrix | PASS | Default `App`, custom `DnuiCommandApp`, custom `DnuiApp`, missing assembly or type, non-`DnuiApp` (R10) |
 | Workflow: build and test on Windows, macOS, and Linux | PASS | CI matrix workflow added by this feature (Linux under `xvfb-run`). CI also packs the six runtime packages into `artifacts/packages/`, and contract tests resolve the runtime from that folder feed |
 
-**Result**: PASS, with one justified deviation in Complexity Tracking.
+**Result**: PASS, with no deviations.
 
 ## Project Structure
 
@@ -140,7 +141,7 @@ Dnui/                              # library, package Cmdless.Dnui
 │   ├── TrayIconDecoder.cs         # path / base64 PNG → icon or error
 │   ├── ITrayHost.cs               # seam
 │   ├── AvaloniaTrayHost.cs        # TrayIcon + NativeMenu implementation
-│   ├── RecordingTrayHost.cs       # Debug-only, selected by DNUI_TRAY_HOST=recording
+│   ├── HeadlessTrayHost.cs        # tray --headless: same state, no OS icon (always available)
 │   └── Client/
 │       ├── DnuiTray.cs            # public: process + JsonRpc session, events, updates
 │       ├── DnuiTrayOptions.cs     # public: options, DnuiTrayItem, DnuiTrayIcon
@@ -181,7 +182,7 @@ Argument parsing, assembly loading, and platform probes live in the runtime (res
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| Debug-only test switch in product code (`DNUI_TRAY_HOST=recording`, plus `$/dnui/test/open` and `$/dnui/test/click` JSON-RPC methods for simulated menu events) | Process-level contract tests must run on CI agents with no tray host. The constitution requires CLI contract tests on all three OSes. | Real-tray-only tests can't run on CI. Avalonia.Headless has no tray implementation. The switch is compiled out of Release builds, so shipped runtimes are unaffected. |
+| — | No violations. Test support is the public `--headless` option and the `tray/getState` / `tray/simulate*` protocol methods (FR-047–FR-050), not build-specific hooks. | — |
 
 ## Post-Design Constitution Re-check
 

@@ -55,8 +55,12 @@ Without the app options, the built-in `App` (a `DnuiCommandApp`) is used.
 
 ### `tray`
 
-Shows one system tray icon controlled over stdio. No options in v1. The protocol is in
+Shows one system tray icon controlled over stdio. The protocol is in
 [tray-protocol.md](tray-protocol.md).
+
+| Option | Meaning |
+|---|---|
+| `--headless` | Run without a real OS tray icon. Everything else (protocol, state, notifications, lifecycle, exit codes) is identical. No tray host is needed, so exit code 21 never happens. Use it for automated tests and CI. |
 
 Requirements: stdin and stdout must both be redirected (pipes). In tray mode, stdout carries
 only protocol messages. Diagnostics and any `Console.Write*` output go to stderr.
@@ -83,8 +87,8 @@ own errors should use codes 64–255. Exit codes above 255 are truncated on macO
 An unexpected crash (an unhandled exception, or the process being killed) may exit without any
 stdout output, so callers must handle "non-zero exit code and no result".
 
-## Debug-only
+## Testing support
 
-`DNUI_TRAY_HOST=recording` (honored only by Debug builds) replaces the real tray with a host
-that writes state snapshots to stderr as JSON lines. It is for contract tests and isn't part
-of the public contract. Tests may rely on it because they pin the runtime build they run.
+There are no build-specific or environment-variable test hooks. Automated tests use the public
+`tray --headless` option, together with the `tray/getState`, `tray/simulateOpen`, and
+`tray/simulateClick` protocol methods. These work identically in every released build.

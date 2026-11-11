@@ -68,7 +68,7 @@ replaced as soon as a non-empty item list is applied.
  AwaitingInitialize ──initialize bad version──▶ AwaitingInitialize (error returned)
  AwaitingInitialize ──any tray/* request──▶ AwaitingInitialize (NotInitialized error)
  Running ──initialize──▶ Running (AlreadyInitialized error)
- Running ──tray/setItems | tray/setIcon──▶ Running
+ Running ──tray/setItems | tray/setIcon | tray/getState | tray/simulate*──▶ Running
  any ──input end-of-file / write failure──▶ ShuttingDown ──▶ Resolve(null, 0): icon removed, exit 0
 ```
 
