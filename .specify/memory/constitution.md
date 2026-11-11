@@ -92,11 +92,22 @@ Getting the runtime onto a machine is a library responsibility.
   return the absolute path to the runtime executable.
 - The cache MUST be keyed by runtime version and RID, so multiple apps and versions coexist
   and are reused without re-downloading.
+- On-disk layout (shared by every Cmdless product, so tools can find each other's caches):
+  - `CmdlessRoot` defaults to `~/.cmdless` (the user's home directory on every OS) and is
+    overridden by the `CMDLESS_ROOT` environment variable.
+  - `DnuiRoot` defaults to `{CmdlessRoot}/dotnet`.
+  - Extracted NuGet packages go in `{DnuiRoot}/packages/{name}/{version}/{rid}/`, where
+    `{name}` is the package id without its RID suffix, lowercased (for example,
+    `{DnuiRoot}/packages/cmdless.dnui.runtime/0.1.0/osx-arm64/`).
+  - Cross-process locks go in `{DnuiRoot}/locks/`.
+  - New kinds of Dnui state MUST go in a named subfolder of `DnuiRoot`, never directly in
+    `CmdlessRoot`, and never anywhere else unless a plan justifies it.
 - Acquisition MUST be idempotent and safe under concurrent callers (multiple processes
   resolving at once MUST NOT corrupt the cache). Partial extractions MUST NOT be reported as
   usable.
 - Downloaded packages MUST be integrity-checked before extraction is treated as complete.
-- The cache root MUST be overridable by consumers and by environment configuration.
+- The roots MUST be overridable by consumers in code, and `CmdlessRoot` through
+  `CMDLESS_ROOT`. A code override takes precedence over the environment variable.
 
 Rationale: an exact match guarantees that the runtime loading a consumer's app was built
 against the same Dnui and Avalonia binaries as that app.
@@ -184,4 +195,4 @@ incompatibility rather than a protocol error.
 - Compliance: each feature plan's Constitution Check MUST pass, or list every violation with
   its justification in the plan's complexity tracking. Unjustified violations block merge.
 
-**Version**: 2.1.0 | **Ratified**: 2026-11-08 | **Last Amended**: 2026-11-10
+**Version**: 2.2.0 | **Ratified**: 2026-11-08 | **Last Amended**: 2026-11-10
