@@ -15,13 +15,25 @@ public class NeverResolvingWindow : DnuiWindow
 
 public class ParentClosesChildWindow : DnuiWindow
 {
+    /// <summary>The child's result task, observed by <see cref="ObservesParentCloseWindow"/>, which outlives this window.</summary>
+    public static Task<JsonNode?>? LastChild { get; private set; }
+
     public ParentClosesChildWindow() => Opened += async (_, _) =>
     {
-        var child = Ui.OpenWindowAsync<NeverResolvingWindow>();
+        LastChild = Ui.OpenWindowAsync<NeverResolvingWindow>();
         await Task.Delay(200);
         Close();
-        var result = await child;
-        Console.Error.WriteLine("dnui-test: child-after-parent-close=" + (result is null ? "null" : "value"));
+    };
+}
+
+/// <summary>Stays open while its child (which owns a grandchild) closes, then reports both results.</summary>
+public class ObservesParentCloseWindow : DnuiWindow
+{
+    public ObservesParentCloseWindow() => Opened += async (_, _) =>
+    {
+        var parent = await Ui.OpenWindowAsync<ParentClosesChildWindow>();
+        var child = await ParentClosesChildWindow.LastChild!;
+        Resolve(new JsonObject { ["parentIsNull"] = parent is null, ["childIsNull"] = child is null });
     };
 }
 

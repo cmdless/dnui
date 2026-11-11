@@ -35,12 +35,24 @@ public class PickTwiceWindow : DnuiWindow
 
 public class CloseDuringDialogWindow : DnuiWindow
 {
-    public CloseDuringDialogWindow() => Opened += async (_, _) =>
+    /// <summary>The dialog's result task, observed by <see cref="ObservesDialogCloseWindow"/>, which outlives this window.</summary>
+    public static Task<IReadOnlyList<string>?>? Pending { get; private set; }
+
+    public CloseDuringDialogWindow() => Opened += (_, _) =>
     {
-        var pending = Ui.OpenFoldersAsync();
+        Pending = Ui.OpenFoldersAsync();
         Close();
-        var result = await pending;
-        Console.Error.WriteLine("dnui-test: dialog-after-close=" + (result is null ? "null" : "value"));
+    };
+}
+
+/// <summary>Stays open while its child closes with a dialog pending, then reports the dialog's result.</summary>
+public class ObservesDialogCloseWindow : DnuiWindow
+{
+    public ObservesDialogCloseWindow() => Opened += async (_, _) =>
+    {
+        await Ui.OpenWindowAsync<CloseDuringDialogWindow>();
+        var dialog = await CloseDuringDialogWindow.Pending!;
+        Resolve(new JsonObject { ["dialogIsNull"] = dialog is null });
     };
 }
 

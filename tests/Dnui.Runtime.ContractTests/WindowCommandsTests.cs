@@ -28,10 +28,10 @@ public class WindowCommandsTests
     [Fact]
     public async Task WindowClosingDuringDialog_CancelsIt()
     {
-        var (code, stdout, stderr) = await Window("CloseDuringDialogWindow", null, """{"paths":["/q"]}""");
+        // An outer window observes, so the result doesn't race process shutdown.
+        var (code, stdout, _) = await Window("ObservesDialogCloseWindow", null, """{"paths":["/q"]}""");
         Assert.Equal(0, code);
-        Assert.Equal("""{"result":null}""", Assert.Single(stdout));
-        Assert.Contains("dnui-test: dialog-after-close=null", stderr);
+        Assert.Equal("""{"result":{"dialogIsNull":true}}""", Assert.Single(stdout));
     }
 
     [Fact]
@@ -53,10 +53,10 @@ public class WindowCommandsTests
     [Fact]
     public async Task ParentClosing_ClosesChild_WithNull()
     {
-        var (code, stdout, stderr) = await Window("ParentClosesChildWindow");
+        // An outer window observes, so the child's result doesn't race process shutdown.
+        var (code, stdout, _) = await Window("ObservesParentCloseWindow");
         Assert.Equal(0, code);
-        Assert.Equal("""{"result":null}""", Assert.Single(stdout));
-        Assert.Contains("dnui-test: child-after-parent-close=null", stderr);
+        Assert.Equal("""{"result":{"parentIsNull":true,"childIsNull":true}}""", Assert.Single(stdout));
     }
 
     [Fact]
