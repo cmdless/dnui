@@ -9,7 +9,7 @@ namespace Dnui;
 // Same shape for every command. StdOut is null when nothing was resolved (always for tray).
 public sealed record DnuiResult(int ExitCode, string? StdOut);
 
-public sealed class DnuiTrayOptions
+public sealed record DnuiTrayOptions
 {
     // Runtime resolution: CmdlessRoot, feed, or a dev RuntimePath override. Null = all defaults,
     // so the runtime is found or downloaded automatically (contracts/runtime-acquisition.md).

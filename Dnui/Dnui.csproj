@@ -28,4 +28,9 @@
     <PackageReference Include="StreamJsonRpc" Version="2.26.150" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- buildTransitive: consumers (and their consumers) get the dnui/ shipping target. -->
+    <None Include="build/Cmdless.Dnui.targets" Pack="true" PackagePath="buildTransitive/Cmdless.Dnui.targets" />
+  </ItemGroup>
+
 </Project>

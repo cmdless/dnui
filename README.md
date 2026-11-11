@@ -25,6 +25,46 @@ var result = await tray.Completion; // DnuiResult(ExitCode, StdOut)
 The first `StartAsync` on a machine downloads `Cmdless.Dnui.Runtime.<rid>` at exactly the
 library's version into the shared cache; every later start reuses it with no network access.
 
+## Windows and dialogs
+
+```csharp
+// Host commands: each call starts its own runtime process, and may use its own app.
+var files  = await DnuiHost.Default.OpenFilesAsync(new() { AllowMultiple = true, Filters = [new("Images", ["*.png", "*.jpg"])] });
+var result = await DnuiHost.Default.OpenWindowAsync<SettingsWindow>();          // your XAML window
+var other  = await DnuiHost.Default.OpenWindowAsync<SettingsWindow, MyApp>();   // with your own app
+
+// Window commands: inside a DnuiWindow, parented to it (modal; a sheet on macOS).
+public partial class SettingsWindow : DnuiWindow
+{
+    async void Browse() => Folder = (await Ui.OpenFoldersAsync())?[0];
+    async void Edit()   => Item   = await Ui.OpenWindowAsync<EditItemWindow>(); // owned child window
+    void Save()         => Resolve(new JsonObject { ["saved"] = true });
+}
+```
+
+- **Host commands** (`DnuiHost`, and `tray`/`window`/`dialog` on the CLI) start a new process
+  and may override the app. **Window commands** (`DnuiWindow.Ui`) stay in the window's process,
+  inherit its app, and are parented to the window.
+- **One project, any publish mode.** Your windows and apps run inside the Dnui runtime, which
+  loads IL. For single-file and native AOT publishes, `Cmdless.Dnui` automatically copies your
+  project's IL into `dnui/` next to the executable. Turn that off with
+  `<DnuiShipUiAssemblies>false</DnuiShipUiAssemblies>`.
+- **From a shell**: `Dnui.Runtime dialog open-file --multiple --filter "Images:*.png,*.jpg"` prints
+  `{"paths":[…]}`, or `{"paths":null}` when cancelled.
+
+## Testing your UI
+
+Windows and dialogs have a headless mode for CI, with no display needed:
+
+```csharp
+var host  = new DnuiHost(new() { Headless = true, Outcomes = [new JsonObject { ["paths"] = new JsonArray("/tmp/a.png") }] });
+var files = await host.OpenFilesAsync();          // returns the supplied outcome
+var form  = await host.OpenWindowAsync<MyForm>(); // runs your window on Avalonia's headless platform
+```
+
+On the CLI, use `dialog … --headless --outcome '<json>'`, and `window … --headless --dialog-outcome '<json>'`
+for a window's own dialogs.
+
 ## Where things live
 
 | Path | Contents |

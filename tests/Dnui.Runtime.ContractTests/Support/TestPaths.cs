@@ -11,6 +11,8 @@ internal static class TestPaths
 
     public static string TestAppsDll => Metadata("DnuiTestAppsDll");
 
+    public static string TestAppsExtraDll => Metadata("DnuiTestAppsExtraDll");
+
     public static string RepoRoot => Metadata("DnuiRepoRoot");
 
     /// <summary>The local folder feed produced by PackRuntime.</summary>

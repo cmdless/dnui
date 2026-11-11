@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- A single-project consumer: its own window and app, published in every mode by the publish tests. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Dnui\Dnui.csproj" />
+  </ItemGroup>
+
+  <!-- Stands in for the Cmdless.Dnui package's buildTransitive import. -->
+  <Import Project="..\..\Dnui\build\Cmdless.Dnui.targets" />
+</Project>

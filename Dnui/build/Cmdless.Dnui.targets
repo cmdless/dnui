@@ -1,0 +1,60 @@
+<Project>
+  <!--
+    Cmdless.Dnui build integration (spec 002 FR-003d, research R4).
+
+    Dnui windows and apps run inside the Dnui runtime, which loads IL. Single-file and native AOT
+    publishes don't ship the project's IL, so after those publishes this copies the project's IL
+    assembly, its .deps.json, and its private managed dependencies into $(PublishDir)dnui/.
+    Assemblies the runtime provides (Avalonia, Dnui, and their dependencies) are skipped.
+
+    Turn off with <DnuiShipUiAssemblies>false</DnuiShipUiAssemblies>.
+  -->
+  <PropertyGroup>
+    <DnuiShipUiAssemblies Condition="'$(DnuiShipUiAssemblies)' == ''">true</DnuiShipUiAssemblies>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!--
+      Packages whose assemblies the runtime already carries (prefix match on NuGetPackageId): the
+      .NET runtime packs, Avalonia and its native/graphics dependencies, and Dnui's own dependency
+      closure. The runtime's copies always win (they're on its trusted platform list), so shipping
+      them would only add size.
+    -->
+    <DnuiRuntimeProvidedPackagesPattern>^(Microsoft\.NETCore\.App|Microsoft\.AspNetCore\.App|Microsoft\.WindowsDesktop\.App|runtime\.|Avalonia|Cmdless\.Dnui|SkiaSharp|HarfBuzzSharp|MicroCom|Tmds\.DBus|StreamJsonRpc|MessagePack|Nerdbank|PolyType|Newtonsoft\.Json|Microsoft\.VisualStudio\.(Threading|Validation)|Microsoft\.NET\.StringTools|System\.IO\.Pipelines)(\.|$)</DnuiRuntimeProvidedPackagesPattern>
+  </PropertyGroup>
+
+  <Target Name="DnuiShipUiAssemblies"
+          AfterTargets="Publish"
+          Condition="'$(DnuiShipUiAssemblies)' == 'true' and ('$(PublishAot)' == 'true' or '$(PublishSingleFile)' == 'true')">
+    <PropertyGroup>
+      <_DnuiShipDir>$([MSBuild]::NormalizeDirectory('$(PublishDir)', 'dnui'))</_DnuiShipDir>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <!-- The IL assembly in obj/. (Under native AOT, @(IntermediateAssembly) is retargeted to the native binary.) -->
+      <_DnuiShipOwn Include="$([System.IO.Path]::GetFullPath('$(ProjectDir)$(IntermediateOutputPath)$(TargetName).dll'))" />
+      <_DnuiShipOwn Include="$(ProjectDepsFilePath)" Condition="'$(ProjectDepsFilePath)' != '' and Exists('$(ProjectDepsFilePath)')" />
+
+      <!-- Managed dependencies only; framework assemblies (self-contained) never ship. -->
+      <_DnuiShipRef Include="@(ReferenceCopyLocalPaths)" Condition="'%(Extension)' == '.dll' and '%(ReferenceCopyLocalPaths.FrameworkReferenceName)' == '' and '%(ReferenceCopyLocalPaths.AssetType)' != 'native'" />
+      <_DnuiShipRef Remove="@(_DnuiShipRef)" Condition="'%(Filename)' == 'Dnui'" />
+    </ItemGroup>
+
+    <!-- Drop anything from a runtime-provided package (prefix match on NuGetPackageId). -->
+    <ItemGroup>
+      <_DnuiShipRefWithPackage Include="@(_DnuiShipRef)" Condition="'%(_DnuiShipRef.NuGetPackageId)' != ''">
+        <DnuiPackage>%(_DnuiShipRef.NuGetPackageId)</DnuiPackage>
+      </_DnuiShipRefWithPackage>
+      <_DnuiShipRef Remove="@(_DnuiShipRefWithPackage)" />
+      <_DnuiShipRefWithPackage Remove="@(_DnuiShipRefWithPackage)"
+                               Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(DnuiPackage)', '$(DnuiRuntimeProvidedPackagesPattern)', RegexOptions.IgnoreCase))" />
+      <_DnuiShipRef Include="@(_DnuiShipRefWithPackage)" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(_DnuiShipOwn)" DestinationFolder="$(_DnuiShipDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_DnuiShipRef)"
+          DestinationFiles="@(_DnuiShipRef->'$(_DnuiShipDir)%(DestinationSubDirectory)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="Dnui: shipped $(TargetName) IL for the Dnui runtime to $(_DnuiShipDir)" />
+  </Target>
+</Project>

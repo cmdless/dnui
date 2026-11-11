@@ -22,6 +22,15 @@ launches it with command-line arguments and gets UI.
 - The built-in command set MUST stay small. The initial commands are window, dialog, and
   tray. A new command needs a justification showing that existing commands cannot express
   the UI.
+- Commands come in two surfaces:
+  - **Host commands** (`tray`, `window`, `dialog`) each start a new runtime process. They MAY
+    override the app (`--app-assembly`/`--app-type`), and anyone MAY invoke them at any time,
+    including code inside a window. The library's convenience functions are host commands.
+    UI shown by a host command is top-level, with no parent in another process.
+  - **Window commands** run inside an existing window's process, through that window's
+    `DnuiWindow.Ui`: child windows owned by the window, and dialogs parented to it. They MUST
+    NOT accept an app override (they inherit the window's app) and MUST NOT offer `tray`.
+  - Parenting is in-process only: a window is never parented to a window in another process.
 - Output contract:
   - The runtime owns stdout. Before any app code runs, it captures the raw stdout stream for
     the app and redirects `Console.Out` to stderr. Stray writes from the runtime, the app,
@@ -69,6 +78,8 @@ acquisition helpers.
   - `DnuiApp` exposes the captured stdio as `Stdio` (`DnuiStdio`). Its `OpenSession()` hands
     out the raw stdin and stdout streams (`DnuiSession`) to exactly one claimant. Built-in
     session commands MUST use this same public API, with no private path.
+  - `DnuiWindow : Window`, the base for consumer windows shown by the `window` command. Its
+    `Ui` provides the window commands, and it resolves one result like an app.
   - `DnuiCommandApp : DnuiApp`, which seals framework initialization to run the built-in
     command chosen by the runtime. Deriving from it customizes how the built-in commands
     run, through overridable members, without taking over the app lifecycle.
@@ -196,4 +207,4 @@ incompatibility rather than a protocol error.
 - Compliance: each feature plan's Constitution Check MUST pass, or list every violation with
   its justification in the plan's complexity tracking. Unjustified violations block merge.
 
-**Version**: 2.2.1 | **Ratified**: 2026-11-08 | **Last Amended**: 2026-11-10
+**Version**: 2.3.0 | **Ratified**: 2026-11-08 | **Last Amended**: 2026-11-11

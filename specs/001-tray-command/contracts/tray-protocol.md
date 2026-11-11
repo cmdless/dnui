@@ -112,6 +112,9 @@ See [data-model.md](../data-model.md) (MenuItem, Icon).
   a platform lets the user select the disabled placeholder item, and callers should ignore it.
 - An empty menu always shows the placeholder item, so `tray/opened` behaves the same with or
   without items.
+- On Windows, the runtime passes its foreground rights on (`AllowSetForegroundWindow`) when an
+  item is clicked. A dialog or window the caller starts in response can then come to the front
+  (spec 002 research R9).
 
 ## Errors
 

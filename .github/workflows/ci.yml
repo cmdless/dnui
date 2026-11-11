@@ -46,3 +46,21 @@ jobs:
       - name: Test (xvfb)
         if: runner.os == 'Linux'
         run: xvfb-run -a dotnet test Dnui.slnx -c Debug --no-build
+
+  # Native AOT needs a native toolchain; one OS is enough to prove the dnui/ shipping works (spec 002 R4).
+  aot-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Install native AOT prerequisites
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+      - name: Build
+        run: dotnet build Dnui.slnx -c Debug
+      - name: Publish tests (including native AOT)
+        env:
+          DNUI_TEST_AOT: '1'
+        run: dotnet test --project tests/Dnui.PublishTests -c Debug --no-build
+
