@@ -9,6 +9,7 @@ namespace Dnui.PublishTests;
 /// commands in every publish mode. Native AOT needs a native toolchain, so it runs only when
 /// DNUI_TEST_AOT=1 (the Linux CI job sets it).
 /// </summary>
+[Collection(nameof(PublishCollection))]
 public class PublishModeTests
 {
     private static string Metadata(string key) => typeof(PublishModeTests).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>().First(a => a.Key == key).Value!;
@@ -71,7 +72,7 @@ public class PublishModeTests
         return output.Trim().Split('\n')[^1].Trim();
     }
 
-    private static async Task<(int Code, string Output)> RunAsync(string file, string[] args, Dictionary<string, string>? env, TimeSpan timeout)
+    internal static async Task<(int Code, string Output)> RunAsync(string file, string[] args, Dictionary<string, string>? env, TimeSpan timeout)
     {
         var info = new ProcessStartInfo(file) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
         foreach (var arg in args)
@@ -91,3 +92,10 @@ public class PublishModeTests
         return (process.ExitCode, await stdout + await stderr);
     }
 }
+
+/// <summary>
+/// The publish and pack tests restore and build the real projects, which share obj/ folders, so they
+/// must not run at the same time (a Release restore mid-way through a Debug build breaks it).
+/// </summary>
+[CollectionDefinition(nameof(PublishCollection))]
+public class PublishCollection;

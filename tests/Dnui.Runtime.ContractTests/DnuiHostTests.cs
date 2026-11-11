@@ -24,10 +24,31 @@ public class DnuiHostTests
     }
 
     [Fact]
-    public async Task RunAsync_ReturnsRawResult()
+    public async Task HeadlessHost_StartsHeadlessTray_WithNoTraySetting()
     {
-        var result = await Host().RunAsync(["dialog", "open-file", "--headless", "--outcome", """{"paths":null}"""]);
-        Assert.Equal(new DnuiResult(0, """{"paths":null}"""), result);
+        // Spec 003 FR-022: headless and runtime settings come only from the host. Without headless,
+        // a runner with no tray host (Linux CI) would fail to start with TrayHostUnavailable.
+        await using var tray = await Host().StartTrayAsync(new() { Icon = DnuiTrayIcon.FromPng(TestPaths.Png), Items = [new("open", "Open")] });
+        await tray.SimulateClickAsync("open");
+        Assert.True((await tray.GetStateAsync()).HasIcon);
+    }
+
+    [Fact]
+    public async Task HostRuntimeSetting_AppliesToEveryCommand()
+    {
+        var missing = new DnuiHost(new() { Runtime = new() { RuntimePath = "/no/such/runtime" }, Headless = true });
+        await Assert.ThrowsAsync<DnuiRuntimeUnavailableException>(() => missing.SaveFileAsync());
+        await Assert.ThrowsAsync<DnuiRuntimeUnavailableException>(() => missing.OpenWindowAsync<ResolveOnOpenWindow>());
+        await Assert.ThrowsAsync<DnuiRuntimeUnavailableException>(() => missing.StartTrayAsync(new()));
+    }
+
+    [Fact]
+    public async Task WithApp_AllFormsRunTheCustomApp()
+    {
+        var host = Host();
+        Assert.Equal("x", (await host.WithApp<CustomCommandApp>().OpenWindowAsync<ResolveOnOpenWindow>())?["name"]?.GetValue<string>());
+        Assert.Equal("x", (await host.WithApp(typeof(CustomCommandApp)).OpenWindowAsync<ResolveOnOpenWindow>())?["name"]?.GetValue<string>());
+        Assert.Equal("x", (await host.WithApp(TestPaths.TestAppsDll, typeof(CustomCommandApp).FullName!).OpenWindowAsync<ResolveOnOpenWindow>())?["name"]?.GetValue<string>());
     }
 
     [Fact]
@@ -35,9 +56,8 @@ public class DnuiHostTests
     {
         var host = Host();
         Assert.Equal("x", (await host.OpenWindowAsync<ResolveOnOpenWindow>())?["name"]?.GetValue<string>());
-        Assert.Equal("x", (await host.OpenWindowAsync<ResolveOnOpenWindow, CustomCommandApp>())?["name"]?.GetValue<string>());
         Assert.Equal("x", (await host.OpenWindowAsync(typeof(ResolveOnOpenWindow)))?["name"]?.GetValue<string>());
-        Assert.Equal("x", (await host.OpenWindowAsync(typeof(ResolveOnOpenWindow).Assembly, typeof(ResolveOnOpenWindow).FullName!))?["name"]?.GetValue<string>());
+        Assert.Equal("x", (await host.OpenWindowAsync(TestPaths.TestAppsDll, typeof(ResolveOnOpenWindow).FullName!))?["name"]?.GetValue<string>());
         Assert.Null(await host.OpenWindowAsync<CloseOnOpenWindow>());
     }
 

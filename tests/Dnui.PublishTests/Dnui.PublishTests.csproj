@@ -23,6 +23,8 @@
   <ItemGroup>
     <!-- Build order only: the runtime is run by the published sample app. -->
     <ProjectReference Include="..\..\Dnui.Runtime\Dnui.Runtime.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\Dnui\Dnui.csproj" />
+    <ProjectReference Include="..\..\Dnui.Tool\Dnui.Tool.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>

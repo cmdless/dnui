@@ -4,25 +4,40 @@ Cross-platform .NET UI through a **cached, per-platform Avalonia runtime**. Your
 small library (`Cmdless.Dnui`); the UI itself runs in a self-contained runtime that is downloaded
 once per machine and shared by every app that uses it.
 
+## From a shell: the `dnui` tool
+
+```bash
+dotnet tool install -g Cmdless.Dnui.Tool
+dnui dialog open-file --multiple --filter "Images:*.png,*.jpg"   # prints {"paths":[…]} or {"paths":null}
+dnx Cmdless.Dnui.Tool dialog save-file --suggested-name report     # one-off, no install
+```
+
+`dnui` forwards its arguments to the runtime unchanged: same output, same exit codes, and
+`dnui tray` speaks the tray protocol. If the runtime can't be downloaded it prints
+`{"error":{"code":"RuntimeUnavailable",…}}` and exits 40.
+
 ## Show a tray icon
 
 ```csharp
 using Dnui;
 
-await using var tray = await DnuiTray.StartAsync(new()
+await using var tray = await DnuiHost.Default.StartTrayAsync(new()
 {
     Icon = DnuiTrayIcon.FromFile("icon.png"),
     Tooltip = "My App",
     Items = [new("open", "Open"), DnuiTrayItem.Separator, new("quit", "Quit")],
+    // Runs before the tray starts, so no event is missed.
+    Configure = t =>
+    {
+        t.Opened += () => Console.WriteLine("menu opened");
+        t.Clicked += id => { if (id == "quit") _ = t.DisposeAsync(); };
+    },
 });
-
-tray.Opened += () => Console.WriteLine("menu opened");
-tray.Clicked += id => { if (id == "quit") _ = tray.DisposeAsync(); };
 
 var result = await tray.Completion; // DnuiResult(ExitCode, StdOut)
 ```
 
-The first `StartAsync` on a machine downloads `Cmdless.Dnui.Runtime.<rid>` at exactly the
+The first start on a machine downloads `Cmdless.Dnui.Runtime.<rid>` at exactly the
 library's version into the shared cache; every later start reuses it with no network access.
 
 ## Windows and dialogs
@@ -31,7 +46,7 @@ library's version into the shared cache; every later start reuses it with no net
 // Host commands: each call starts its own runtime process, and may use its own app.
 var files  = await DnuiHost.Default.OpenFilesAsync(new() { AllowMultiple = true, Filters = [new("Images", ["*.png", "*.jpg"])] });
 var result = await DnuiHost.Default.OpenWindowAsync<SettingsWindow>();          // your XAML window
-var other  = await DnuiHost.Default.OpenWindowAsync<SettingsWindow, MyApp>();   // with your own app
+var other  = await DnuiHost.Default.WithApp<MyApp>().OpenWindowAsync<SettingsWindow>(); // with your own app
 
 // Window commands: inside a DnuiWindow, parented to it (modal; a sheet on macOS).
 public partial class SettingsWindow : DnuiWindow
@@ -43,14 +58,13 @@ public partial class SettingsWindow : DnuiWindow
 ```
 
 - **Host commands** (`DnuiHost`, and `tray`/`window`/`dialog` on the CLI) start a new process
-  and may override the app. **Window commands** (`DnuiWindow.Ui`) stay in the window's process,
+  and may override the app with `WithApp<TApp>()` (or `WithApp(Type)`, or an assembly path and
+  type name). Windows likewise take a generic type, a `Type`, or an assembly path and type name. **Window commands** (`DnuiWindow.Ui`) stay in the window's process,
   inherit its app, and are parented to the window.
 - **One project, any publish mode.** Your windows and apps run inside the Dnui runtime, which
   loads IL. For single-file and native AOT publishes, `Cmdless.Dnui` automatically copies your
   project's IL into `dnui/` next to the executable. Turn that off with
   `<DnuiShipUiAssemblies>false</DnuiShipUiAssemblies>`.
-- **From a shell**: `Dnui.Runtime dialog open-file --multiple --filter "Images:*.png,*.jpg"` prints
-  `{"paths":[…]}`, or `{"paths":null}` when cancelled.
 
 ## Testing your UI
 
@@ -70,6 +84,7 @@ for a window's own dialogs.
 | Path | Contents |
 |---|---|
 | `CmdlessRoot` | `~/.cmdless`, or `CMDLESS_ROOT`, or `DnuiRuntimeOptions.CmdlessRoot` (code wins) |
+| Package source | nuget.org, or `DNUI_PACKAGE_SOURCE` (a NuGet v3 feed URL or a folder of `.nupkg` files), or `DnuiRuntimeOptions.PackageSource` (code wins) |
 | `{CmdlessRoot}/dotnet/packages/{id}/{version}/` | Installed runtime packages (`.dnui-complete` marks a finished install) |
 | `{CmdlessRoot}/dotnet/locks/` | Cross-process install locks |
 
@@ -83,7 +98,7 @@ Dnui.Runtime [--app-assembly <dll> --app-type <type>] tray [--headless]
 
 - **`tray`** speaks newline-delimited JSON-RPC 2.0 on stdin/stdout
   ([protocol](specs/001-tray-command/contracts/tray-protocol.md)). Closing stdin ends it.
-- **`--headless`** runs everything but the OS tray icon. With `tray/getState`,
+- **`--headless`** runs on Avalonia's headless platform with a simulated tray icon: no display, no Dock icon, no focus changes. With `tray/getState`,
   `tray/simulateOpen`, and `tray/simulateClick` it is how automated tests drive a tray.
 - **Custom apps**: derive from `DnuiCommandApp` to customize the built-in commands, or from
   `DnuiApp` to take over entirely — then either `Resolve(json, exitCode)` once, or claim
@@ -104,8 +119,18 @@ Pack a runtime for one platform into the local feed `artifacts/packages/`:
 dotnet build Dnui.Runtime -t:PackRuntime -p:RuntimeIdentifier=osx-arm64
 ```
 
-Point a client at it with `Runtime = new() { PackageSource = "artifacts/packages" }` (or use
-`RuntimePath` to run a locally built executable directly).
+Point a client at it with `new DnuiHost(new() { Runtime = new() { PackageSource = "artifacts/packages" } })`,
+or set `DNUI_PACKAGE_SOURCE=artifacts/packages` (works for the `dnui` tool too). `RuntimePath`
+runs a locally built executable directly.
 
-Design documents: [specs/001-tray-command](specs/001-tray-command/) and the project
+## Releasing
+
+Set `DnuiRuntimeVersion` in `Directory.Build.props`, merge, then tag and push `v<version>`. The
+release workflow packs everything, waits for approval in the `nuget` environment, publishes to
+nuget.org with trusted publishing (runtime packages first), and creates the GitHub Release.
+Details: [release.md](specs/003-tool-publishing/contracts/release.md).
+
+Design documents: [specs/001-tray-command](specs/001-tray-command/),
+[specs/002-windows-dialogs](specs/002-windows-dialogs/),
+[specs/003-tool-publishing](specs/003-tool-publishing/), and the project
 [constitution](.specify/memory/constitution.md).

@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../..'))</RepoRoot>
+    <RuntimeExeName Condition="'$(OS)' == 'Windows_NT'">Dnui.Runtime.exe</RuntimeExeName>
+    <RuntimeExeName Condition="'$(OS)' != 'Windows_NT'">Dnui.Runtime</RuntimeExeName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="4.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Build order only: the tool is packed and installed by the tests. -->
+    <ProjectReference Include="..\..\Dnui\Dnui.csproj" />
+    <ProjectReference Include="..\..\Dnui.Runtime\Dnui.Runtime.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\Dnui.Tool\Dnui.Tool.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyMetadata Include="DnuiRepoRoot" Value="$(RepoRoot)" />
+    <AssemblyMetadata Include="DnuiRuntimeExe" Value="$(RepoRoot)/Dnui.Runtime/bin/$(Configuration)/$(TargetFramework)/$(RuntimeExeName)" />
+    <AssemblyMetadata Include="DnuiRuntimeVersion" Value="$(DnuiRuntimeVersion)" />
+    <AssemblyMetadata Include="DnuiConfiguration" Value="$(Configuration)" />
+  </ItemGroup>
+
+</Project>

@@ -18,8 +18,30 @@ internal static class TestPaths
     /// <summary>The local folder feed produced by PackRuntime.</summary>
     public static string PackagesFeed => Path.Combine(RepoRoot, "artifacts", "packages");
 
-    public static bool HasPackageForCurrentRid =>
-        Directory.Exists(PackagesFeed) && Directory.EnumerateFiles(PackagesFeed, $"{DnuiRuntime.PackageId}.{DnuiRuntime.Version}.nupkg").Any();
+    /// <summary>
+    /// A local runtime package exists and is not older than the runtime build. A stale package would
+    /// install old runtime code (for example one that still takes desktop focus in headless mode).
+    /// </summary>
+    public static bool HasPackageForCurrentRid
+    {
+        get
+        {
+            var package = Path.Combine(PackagesFeed, $"{DnuiRuntime.PackageId}.{DnuiRuntime.Version}.nupkg");
+            if (!File.Exists(package))
+            {
+                return false;
+            }
+
+            var built = Path.GetDirectoryName(RuntimeExe)!;
+            var newestBinary = new[] { "Dnui.Runtime.dll", "Dnui.dll" }
+                .Select(name => Path.Combine(built, name))
+                .Where(File.Exists)
+                .Select(File.GetLastWriteTimeUtc)
+                .DefaultIfEmpty(DateTime.MinValue)
+                .Max();
+            return File.GetLastWriteTimeUtc(package) >= newestBinary;
+        }
+    }
 
     public static readonly byte[] Png = Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==");

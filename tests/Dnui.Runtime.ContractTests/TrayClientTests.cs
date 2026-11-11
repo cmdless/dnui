@@ -5,10 +5,10 @@ namespace Dnui.Runtime.ContractTests;
 /// <summary>US5: the .NET tray client, public API only, headless.</summary>
 public class TrayClientTests
 {
-    private static DnuiTrayOptions Options(params DnuiTrayItem[] items) => new()
+    internal static readonly DnuiHost Host = new(new() { Runtime = new() { RuntimePath = TestPaths.RuntimeExe }, Headless = true });
+
+    internal static DnuiTrayOptions Options(params DnuiTrayItem[] items) => new()
     {
-        Runtime = new() { RuntimePath = TestPaths.RuntimeExe },
-        Headless = true,
         Icon = DnuiTrayIcon.FromPng(TestPaths.Png),
         Tooltip = "tip",
         Items = items.Length == 0 ? [new("open", "Open"), DnuiTrayItem.Separator, new("off", "Off") { Enabled = false }] : items,
@@ -17,7 +17,7 @@ public class TrayClientTests
     [Fact]
     public async Task Start_Simulate_Events_State_Dispose()
     {
-        await using var tray = await DnuiTray.StartAsync(Options());
+        await using var tray = await Host.StartTrayAsync(Options());
         Assert.Equal(DnuiRuntime.Version, tray.RuntimeVersion);
 
         var events = new List<string>();
@@ -42,7 +42,7 @@ public class TrayClientTests
     [Fact]
     public async Task ProtocolErrors_SurfaceAsProtocolException_AndTrayKeepsRunning()
     {
-        await using var tray = await DnuiTray.StartAsync(Options());
+        await using var tray = await Host.StartTrayAsync(Options());
 
         var dup = await Assert.ThrowsAsync<DnuiTrayProtocolException>(() => tray.SetItemsAsync([new("a", "A"), new("a", "B")]));
         Assert.Equal(1010, dup.Code);
@@ -57,7 +57,7 @@ public class TrayClientTests
     [Fact]
     public async Task RuntimeKilled_CompletionReportsExitCode_AndCallsFail()
     {
-        await using var tray = await DnuiTray.StartAsync(Options());
+        await using var tray = await Host.StartTrayAsync(Options());
         var state = await tray.GetStateAsync();
         Assert.NotNull(state);
 
@@ -72,14 +72,11 @@ public class TrayClientTests
     [Fact]
     public async Task StartFailure_CarriesExitCode()
     {
-        var ex = await Assert.ThrowsAsync<DnuiTrayStartException>(() => DnuiTray.StartAsync(new()
-        {
-            Runtime = new() { RuntimePath = TestPaths.RuntimeExe },
-            Headless = true,
-            AppAssembly = TestPaths.TestAppsDll,
-            AppType = "Dnui.TestApps.NotAnApp",
-        }));
+        // Spec 003 R12 #9: tray start failures are DnuiCommandException, like every host command.
+        var ex = await Assert.ThrowsAsync<DnuiCommandException>(() =>
+            Host.WithApp(TestPaths.TestAppsDll, "Dnui.TestApps.NotAnApp").StartTrayAsync(Options()));
         Assert.Equal(new DnuiResult(12, null), ex.Result);
+        Assert.Equal("AppTypeInvalid", ex.ErrorCode);
     }
 
     [Fact]
@@ -87,13 +84,13 @@ public class TrayClientTests
     {
         using var cts = new CancellationTokenSource();
         cts.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => DnuiTray.StartAsync(Options(), cts.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Host.StartTrayAsync(Options(), cts.Token));
     }
 
     [Fact]
     public async Task ThrowingHandler_IsReported_ConnectionStaysUp()
     {
-        await using var tray = await DnuiTray.StartAsync(Options());
+        await using var tray = await Host.StartTrayAsync(Options());
         Exception? reported = null;
         tray.UnhandledHandlerException += ex => reported = ex;
         tray.Opened += () => throw new InvalidOperationException("boom");

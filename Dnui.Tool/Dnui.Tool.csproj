@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Published as a .NET tool (constitution: forwards only; spec 003 research R4). -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>dnui</ToolCommandName>
+    <PackageId>Cmdless.Dnui.Tool</PackageId>
+    <Description>The dnui command: runs Dnui UI commands (dialogs, windows, trays) from any shell. Downloads the matching Cmdless.Dnui runtime on first use. Install with: dotnet tool install -g Cmdless.Dnui.Tool</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <!-- Runs on newer .NET runtimes too. -->
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dnui\Dnui.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\build\package\readme\Tool.md" Pack="true" PackagePath="README.md" Visible="false" />
+  </ItemGroup>
+
+</Project>

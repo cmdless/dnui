@@ -1,12 +1,12 @@
 namespace Dnui;
 
 /// <summary>How the runtime is located (contracts/runtime-acquisition.md). All properties are optional.</summary>
-public sealed class DnuiRuntimeOptions
+public sealed record DnuiRuntimeOptions
 {
     /// <summary>Overrides the <c>CMDLESS_ROOT</c> environment variable and the <c>~/.cmdless</c> default.</summary>
     public string? CmdlessRoot { get; init; }
 
-    /// <summary>A NuGet v3 service index URL, or a local folder of .nupkg files. Default: nuget.org.</summary>
+    /// <summary>A NuGet v3 service index URL, or a local folder of .nupkg files. Overrides <c>DNUI_PACKAGE_SOURCE</c>; default nuget.org.</summary>
     public string? PackageSource { get; init; }
 
     /// <summary>Development/test override: use this runtime executable and skip resolution entirely.</summary>

@@ -32,23 +32,26 @@ internal sealed class DnuiWindowCommands : IDnuiWindowCommands
     public async Task<string?> SaveFileAsync(DnuiSaveFileOptions? options = null, CancellationToken cancellationToken = default) =>
         DialogOutcome.ReadPath(await RunDialogAsync(DialogKind.SaveFile, options ?? new(), cancellationToken).ConfigureAwait(true));
 
-    public Task<JsonNode?> OpenWindowAsync<TWindow>(CancellationToken cancellationToken = default) where TWindow : DnuiWindow, new() =>
-        ShowChildAsync(() => new TWindow(), cancellationToken);
+    public Task<JsonNode?> OpenWindowAsync<TWindow>(CancellationToken cancellationToken = default) where TWindow : DnuiWindow =>
+        OpenWindowAsync(typeof(TWindow), cancellationToken);
 
     public Task<JsonNode?> OpenWindowAsync(Type windowType, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(windowType);
         var check = DnuiTypeLoader.CheckType(windowType, typeof(DnuiWindow));
         return check.Type is { } type
             ? ShowChildAsync(() => (DnuiWindow)Activator.CreateInstance(type)!, cancellationToken)
             : Task.FromException<JsonNode?>(Fail(check));
     }
 
-    public Task<JsonNode?> OpenWindowAsync(Assembly assembly, string typeName, CancellationToken cancellationToken = default)
+    public Task<JsonNode?> OpenWindowAsync(string windowAssemblyPath, string windowTypeName, CancellationToken cancellationToken = default)
     {
-        var found = DnuiTypeLoader.FindType(assembly, typeName, typeof(DnuiWindow));
-        return found.Type is { } type
+        ArgumentException.ThrowIfNullOrEmpty(windowAssemblyPath);
+        ArgumentException.ThrowIfNullOrEmpty(windowTypeName);
+        var loaded = DnuiTypeLoader.Load(windowAssemblyPath, windowTypeName, typeof(DnuiWindow));
+        return loaded.Type is { } type
             ? ShowChildAsync(() => (DnuiWindow)Activator.CreateInstance(type)!, cancellationToken)
-            : Task.FromException<JsonNode?>(Fail(found));
+            : Task.FromException<JsonNode?>(Fail(loaded));
     }
 
     private static DnuiCommandException Fail(TypeLoadResult result)

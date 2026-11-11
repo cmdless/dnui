@@ -3,12 +3,18 @@
   <metadata>
     <id>$id$</id>
     <version>$version$</version>
-    <authors>Cmdless</authors>
-    <license type="expression">MIT</license>
-    <description>Self-contained Dnui runtime for $rid$. Downloaded and cached automatically by Cmdless.Dnui; do not reference this package directly.</description>
+    <authors>$authors$</authors>
+    <license type="expression">$license$</license>
+    <projectUrl>$projectUrl$</projectUrl>
+    <repository type="git" url="$repositoryUrl$" />
+    <icon>icon.png</icon>
+    <readme>README.md</readme>
+    <description>Runtime for Cmdless.Dnui ($rid$) — not meant to be referenced directly. The Dnui library and the dnui tool download it automatically at exactly their own version.</description>
     <tags>dnui cmdless avalonia runtime</tags>
   </metadata>
   <files>
     <file src="**/*" target="runtime" />
+    <file src="$icon$" target="icon.png" />
+    <file src="$readme$" target="README.md" />
   </files>
 </package>

@@ -12,6 +12,9 @@ public static class DnuiRuntime
     /// <summary>The environment variable that overrides the Cmdless root.</summary>
     public const string CmdlessRootVariable = "CMDLESS_ROOT";
 
+    /// <summary>The environment variable that overrides the package source (a NuGet v3 service index URL or a folder of .nupkg files).</summary>
+    public const string PackageSourceVariable = "DNUI_PACKAGE_SOURCE";
+
     /// <summary>The runtime version this library requires (lockstep, exact match).</summary>
     public static string Version => DnuiBuildInfo.RuntimeVersion;
 
@@ -47,7 +50,19 @@ public static class DnuiRuntime
     /// </summary>
     /// <exception cref="DnuiRuntimeUnavailableException">The runtime could not be obtained.</exception>
     public static Task<string> ResolveAsync(DnuiRuntimeOptions? options = null, CancellationToken cancellationToken = default) =>
-        ResolveAsync(options, CurrentRid, PackageFeed.Create(options?.PackageSource), cancellationToken);
+        ResolveAsync(options, CurrentRid, PackageFeed.Create(GetPackageSource(options)), cancellationToken);
+
+    /// <summary>The package source: the option, else <c>DNUI_PACKAGE_SOURCE</c>, else null (nuget.org).</summary>
+    internal static string? GetPackageSource(DnuiRuntimeOptions? options)
+    {
+        if (!string.IsNullOrEmpty(options?.PackageSource))
+        {
+            return options.PackageSource;
+        }
+
+        var fromEnvironment = Environment.GetEnvironmentVariable(PackageSourceVariable);
+        return string.IsNullOrEmpty(fromEnvironment) ? null : fromEnvironment;
+    }
 
     internal static async Task<string> ResolveAsync(DnuiRuntimeOptions? options, string rid, IPackageSource source, CancellationToken cancellationToken)
     {

@@ -35,7 +35,8 @@ internal static class Program
         }
 
         var stdio = DnuiStdio.CreateFromConsole();
-        if (OperatingSystem.IsMacOS())
+        // Headless runs show nothing, so they must never pull focus from the user's desktop.
+        if (OperatingSystem.IsMacOS() && !cli.Headless)
         {
             DnuiPlatformHooks.BringToFront = MacForeground.Activate;
         }
