@@ -35,6 +35,8 @@ internal sealed class TrayCommand(bool headless) : DnuiCommand
             return ex.Reason == DnuiStdioFailure.NotRedirected ? TrayExitCodes.NotRedirected : TrayExitCodes.AlreadyClaimed;
         }
 
+        Console.Error.WriteLine($"dnui: tray: session open (stdout: {app.StdioInternal.OutputKind}).");
+
         // Created now (synchronous phase); listening starts only once the UI is ready (FR-010).
         TrayProtocolTarget? target = null;
         var input = new DrainOnEndOfInputStream(session.Input, () => target?.WaitUntilIdleAsync() ?? Task.CompletedTask);

@@ -146,7 +146,15 @@ internal sealed class RuntimeProcess : IAsyncDisposable
 
     public async Task<int> WaitForExitAsync(int timeoutMs = 15000)
     {
-        await _process.WaitForExitAsync().WaitAsync(TimeSpan.FromMilliseconds(timeoutMs));
+        try
+        {
+            await _process.WaitForExitAsync().WaitAsync(TimeSpan.FromMilliseconds(timeoutMs));
+        }
+        catch (TimeoutException ex)
+        {
+            throw new TimeoutException($"Runtime did not exit within {timeoutMs} ms. stderr:\n{StdErr}", ex);
+        }
+
         await Task.WhenAll(_stdoutPump, _stderrPump).WaitAsync(TimeSpan.FromSeconds(5));
         return _process.ExitCode;
     }

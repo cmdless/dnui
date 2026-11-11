@@ -88,6 +88,7 @@ internal sealed class WriteFailureStream(Stream inner, Action onFailure) : Strea
 
     private void Fail()
     {
+        Console.Error.WriteLine("dnui: tray: a write to stdout failed.");
         if (Interlocked.Exchange(ref _failed, 1) == 0)
         {
             ThreadPool.QueueUserWorkItem(_ => onFailure());

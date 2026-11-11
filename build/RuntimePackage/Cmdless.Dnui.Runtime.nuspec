@@ -9,6 +9,6 @@
     <tags>dnui cmdless avalonia runtime</tags>
   </metadata>
   <files>
-    <file src="$publishDir$**/*" target="runtime" />
+    <file src="$publishDir$/**/*" target="runtime" />
   </files>
 </package>

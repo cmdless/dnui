@@ -26,8 +26,9 @@ public sealed class DnuiStdio
     private int _sessionOpen;
     private int _resolved;
 
-    internal DnuiStdio(Stream input, Stream output, bool isRedirected)
+    internal DnuiStdio(Stream input, Stream output, bool isRedirected, string outputKind = "stream")
     {
+        OutputKind = outputKind;
         _input = input;
         _output = output;
         IsRedirected = isRedirected;
@@ -39,6 +40,9 @@ public sealed class DnuiStdio
         get => t_current;
         set => t_current = value;
     }
+
+    /// <summary>How stdout was opened, for diagnostics ("raw-handle", "console", or "stream").</summary>
+    internal string OutputKind { get; }
 
     /// <summary>True when stdin and stdout are both redirected (pipes or files).</summary>
     public bool IsRedirected { get; }
@@ -119,6 +123,7 @@ public sealed class DnuiStdio
         }
         catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException or NotSupportedException)
         {
+            Console.Error.WriteLine($"dnui: could not open raw stdout ({ex.GetType().Name}: {ex.Message}); using the console stream.");
             return null;
         }
     }
@@ -136,8 +141,9 @@ public sealed class DnuiStdio
     {
         var redirected = Console.IsInputRedirected && Console.IsOutputRedirected;
         var input = Console.OpenStandardInput();
-        var output = (Console.IsOutputRedirected ? TryOpenRawStdout() : null) ?? Console.OpenStandardOutput();
+        var raw = Console.IsOutputRedirected ? TryOpenRawStdout() : null;
+        var output = raw ?? Console.OpenStandardOutput();
         Console.SetOut(Console.Error);
-        return new DnuiStdio(input, output, redirected);
+        return new DnuiStdio(input, output, redirected, raw is null ? "console" : "raw-handle");
     }
 }
