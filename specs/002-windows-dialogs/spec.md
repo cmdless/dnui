@@ -17,6 +17,11 @@
   one-shot: the caller only gets the resolved result. There's no window protocol or session.
 - Only the built-in Avalonia dialogs (open file, open folder, save file) for now, with basic
   options passed down to Avalonia. The message box and other dialog kinds are later extensions.
+- Convenience functions take window and app types as generics (for example
+  `OpenWindowAsync<TWindow>()` and `OpenWindowAsync<TWindow, TApp>()`), translated to assembly
+  and type arguments, and work the same on every path. A process can load as many window
+  assemblies as it needs, but only one app. A different app means a host command (a new
+  process).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -133,7 +138,10 @@ resolves with the child's value, and the window command's result line reflects i
    owned by the parent (above it, closed with it) and runs in the same process and app.
 2. **Given** an open child window, **When** it resolves or is closed, **Then** the parent's code
    receives the child's result or null.
-3. **Given** window code, **When** it looks for a way to start a tray or override the app through
+3. **Given** a child window type from an assembly not yet loaded in the process, **When** window
+   code opens it, **Then** the assembly is loaded into the same process, and the child uses the
+   parent's app.
+4. **Given** window code, **When** it looks for a way to start a tray or override the app through
    its window commands, **Then** none exists. It must use host commands, which start a new process.
 
 ---
@@ -180,6 +188,9 @@ OSes.
   unbundled runtime shows a generic name. That's a documented limitation.
 - **Dialog command given window-only options, or a window command given an app override**: the
   first is a usage error. The second can't happen, because window commands have no such option.
+- **Generic window or app type with no assembly file** (single-file or native ahead-of-time
+  consumer): a clear error before any process starts. The path-based overload works.
+- **Window and app types from the same assembly**: the assembly is loaded once.
 
 ## Requirements *(mandatory)*
 
@@ -193,9 +204,21 @@ OSes.
 - **FR-002**: The window base MUST provide window commands for code inside a window: the three
   dialogs, parented to that window, and opening a child window. Window commands MUST NOT accept
   an app override and MUST NOT include a tray.
-- **FR-003**: The library MUST provide host-command convenience functions for the three dialogs
-  and for opening a window, returning typed results. These are usable from any .NET code,
-  including code inside a window, which then starts a new, unparented process.
+- **FR-003**: The library MUST provide host-command convenience functions for the three dialogs,
+  for opening a window, and for starting a tray, returning typed results. These are usable from
+  any .NET code, including code inside a window, which then starts a new, unparented process.
+- **FR-003a**: Opening a window MUST be expressible as a generic over the window type
+  (`OpenWindowAsync<TWindow>()`). It MUST be translated to the window's assembly path and type
+  name, with the same signature and behavior on both surfaces: as a host command (new process)
+  and as a window command (a child in the same process).
+- **FR-003b**: Host-command convenience functions MUST also accept the app as a generic (for
+  example, `OpenWindowAsync<TWindow, TApp>()`, `StartTrayAsync<TApp>(...)`, and the dialog
+  functions), translated to `--app-assembly`/`--app-type`. The app type MUST be a command app.
+  Window commands MUST NOT offer an app generic.
+- **FR-003c**: When a generic type's assembly has no file on disk (for example, a consumer
+  published as a single file or with native ahead-of-time compilation), the convenience function
+  MUST fail with a clear error before starting any process, and a path-based overload MUST let
+  the caller point at the assembly explicitly.
 - **FR-004**: The library MUST define one dialog interface, implemented by the host-command
   functions and by window commands, with the same options and result shapes.
 
@@ -218,10 +241,11 @@ OSes.
 
 **Windows**
 
-- **FR-012**: The window command MUST load the type from the given assembly with the same rules as
-  app types: dependency resolution, the Dnui version check, and a type check against the window
-  base before any instance is created. An already-loaded assembly (for example, the app override's)
-  MUST be reused.
+- **FR-012**: The window command and window commands MUST load window types from their assemblies
+  with the same rules as app types: dependency resolution, the Dnui version check, and a type
+  check against the window base before any instance is created. A process MAY load any number of
+  window assemblies; an already-loaded assembly (for example, the app's own) MUST be reused, not
+  loaded again. A process has exactly one app.
 - **FR-013**: Window-loading failures MUST have distinct, documented exit codes and error results
   (unloadable assembly, missing type, wrong base type), separate from the app-type codes. Version
   mismatch shares the existing code.
@@ -229,8 +253,8 @@ OSes.
   window. Closing without resolving MUST yield a null result with exit code 0.
 - **FR-015**: Windows MUST use their own XAML and resources, styled by the process's app.
 - **FR-016**: Child windows opened through window commands MUST be owned by their parent (kept
-  above it, closed with it), run in the same app, and deliver their result or null to the
-  parent's code.
+  above it, closed with it), run in the same process and app (loading the child's assembly if
+  it isn't loaded yet), and deliver their result or null to the parent's code.
 - **FR-017**: Windows started by host commands MUST appear in front, with their own taskbar or Dock
   entry.
 - **FR-018**: Cancelling a library window or dialog call MUST end its process and report
@@ -269,8 +293,9 @@ OSes.
 
 - **SC-001**: A developer gets a file path from the user in one line of their own code, or one
   shell command, on all three OSes.
-- **SC-002**: A developer shows their own XAML window and gets its result in under 10 lines of
-  their own code.
+- **SC-002**: A developer shows their own XAML window and gets its result in one call
+  (`OpenWindowAsync<MyWindow>()`), and the same call opens it as a child when made from window
+  code.
 - **SC-003**: Cancelling any dialog yields a null result with exit code 0 in 100% of test runs.
 - **SC-004**: Every option documented for each dialog visibly takes effect in desktop verification
   on all three OSes, or its absence is documented as a platform gap.
@@ -290,8 +315,12 @@ OSes.
   The exact option spelling is settled in the plan's CLI contract.
 - One-shot commands follow spec 001's output contract. There is no new session in this feature, and
   `tray` is unchanged.
-- Child windows are given as a type already available in the window's process (no new assembly
-  loading through window commands). Loading other assemblies is a host-command concern.
+- Window commands may load additional window assemblies into the window's process. Only the
+  app is fixed per process. A window that needs a different app is opened through a host
+  command (a new process).
+- Generic convenience functions need the type's assembly as a file. Consumers published as a
+  single file or with native ahead-of-time compilation must ship window and app assemblies as
+  separate files and use the path-based overloads.
 - Error and exit codes continue spec 001's scheme: new runtime exit codes stay below 64.
 - Out of scope, for later extensions: message box and other dialog kinds, window-author protocols
   and window sessions, parenting across processes, shared named hosts, app single-instance, OS
