@@ -6,6 +6,7 @@ using System.Xml.Linq;
 namespace Dnui.PublishTests;
 
 /// <summary>Spec 003 US2 / FR-007, FR-014, FR-015: every package carries complete metadata.</summary>
+[Collection(nameof(PublishCollection))]
 public class PackageMetadataTests
 {
     private static string Metadata(string key) => typeof(PackageMetadataTests).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>().First(a => a.Key == key).Value!;
@@ -20,7 +21,7 @@ public class PackageMetadataTests
         var output = Path.Combine(Path.GetTempPath(), "dnui-pack-" + Guid.NewGuid().ToString("N"));
         foreach (var project in new[] { "Dnui", "Dnui.Tool" })
         {
-            var (code, log) = await PublishModeTests.RunAsync("dotnet", ["pack", Path.Combine(RepoRoot, project), "-c", "Debug", "-o", output], null, TimeSpan.FromMinutes(5));
+            var (code, log) = await PublishModeTests.RunAsync("dotnet", ["pack", Path.Combine(RepoRoot, project), "-c", "Release", "-o", output], null, TimeSpan.FromMinutes(5));
             Assert.True(code == 0, log);
         }
 
