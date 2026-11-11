@@ -253,8 +253,63 @@ Each entry records a decision, why it was made, and what else was considered.
 - **Rationale**: the client is the other half of the protocol, and the contract tests need a
   .NET driver anyway. Writing it once, as product code, gives both the consumer API and the
   test harness. The user decided the tray client belongs to the tray spec.
-- **Scope cut**: the runtime path is explicit. The shared launcher, runtime download, and
-  `RunAsync` come in a later feature, and `DnuiResult` is introduced now so they can reuse it.
+- **Runtime**: `StartAsync` first calls `DnuiRuntime.ResolveAsync(options.Runtime)` (R13).
+  `RunAsync` comes in a later feature, and `DnuiResult` and `DnuiRuntimeOptions` are
+  introduced now so it can reuse them.
 - **Alternatives**: a test-only client. That duplicates work and leaves consumers with raw
   JSON-RPC.
+
+## R13. Runtime acquisition (download, cache, lock, verify)
+
+- **Decision**: implement acquisition in the library with only BCL APIs (`HttpClient`,
+  `System.IO.Compression.ZipArchive`, `System.Text.Json`, `System.Xml.Linq`, and
+  `File.SetUnixFileMode`), following the algorithm in
+  [contracts/runtime-acquisition.md](contracts/runtime-acquisition.md).
+  - **Feed**: read the v3 service index once per process (cached in memory). Take the
+    `PackageBaseAddress/3.0.0` resource and download from the flat container
+    `{base}/{id-lower}/{version-lower}/{id-lower}.{version-lower}.nupkg`. A local folder source
+    looks for `{id}.{version}.nupkg`, ignoring case.
+  - **RID**: `RuntimeInformation.RuntimeIdentifier`, which is the portable RID on .NET 8 and
+    later, checked against the six supported RIDs.
+  - **Lock**: `new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None)`,
+    retried every 250 ms until `LockTimeout` or cancellation. The OS releases it if the process
+    dies, so stale locks never block.
+  - **Atomic publish**: extract to `.tmp-{guid}` under the same parent folder, write
+    `.dnui-complete` last, then `Directory.Move` it to `{version}`. A rename within one
+    folder is atomic on every supported OS. Leftover `.tmp-*` folders are deleted while
+    holding the lock.
+  - **Verify**: open the archive and read every entry to the end, which makes `ZipArchive`
+    validate each CRC-32. Parse the `.nuspec` and require an exact id and version match.
+  - **Executable bit**: `File.SetUnixFileMode(exe, UserRead|UserWrite|UserExecute|GroupRead|GroupExecute|OtherRead|OtherExecute)`
+    on macOS and Linux. Downloads through `HttpClient` don't get the macOS quarantine
+    attribute, so Gatekeeper doesn't block the extracted runtime.
+- **Rationale**: the BCL covers everything needed. NuGet.Protocol/NuGet.Packaging would bring
+  a large dependency tree into every consumer (constitution II: library dependencies must be
+  justified) for one flat-container download and a zip extract.
+- **Integrity scope**: CRC plus manifest checks catch truncated or corrupted downloads and
+  wrong packages. They don't defend against a malicious feed. Repository-signature or
+  SHA-512 catalog verification is a later hardening step, recorded as an open item.
+- **Alternatives**: `dotnet tool`-style installation, or shelling out to `nuget`/`dotnet`.
+  Rejected: consumers can't be assumed to have an SDK, and it's slow. NuGet.Protocol:
+  rejected for size, as above.
+
+## R14. Runtime packaging per RID
+
+- **Decision**: add a `PackRuntime` MSBuild target, invoked as
+  `dotnet build Dnui.Runtime -t:PackRuntime -p:RuntimeIdentifier=<rid>`. It runs a
+  self-contained `dotnet publish` for the RID into
+  `artifacts/runtime/<rid>/`, then packs a generated `.nuspec`
+  (`Cmdless.Dnui.Runtime.<rid>`, version `$(DnuiRuntimeVersion)`) with the publish output
+  under `runtime/`. The output goes to `artifacts/packages/`, which doubles as the local
+  folder feed for tests and development.
+  - CI packs all six RIDs. Each RID can be cross-published from any OS, because no native
+    compilation is involved.
+  - Publishing settings: `SelfContained=true`, `PublishSingleFile=false` (Avalonia native
+    libraries load more reliably from a folder), `PublishTrimmed=false` (app assemblies loaded
+    at run time need the full framework).
+- **Rationale**: one target keeps packaging reproducible locally and in CI. A folder feed lets
+  the contract tests exercise real download and extraction without network access.
+- **Alternatives**: a separate packaging `.csproj` per RID (six near-identical projects), or
+  `dotnet pack` with `RuntimeIdentifiers` (NuGet's built-in per-RID packing produces one
+  package with `runtimes/<rid>/`, not separate packages).
 

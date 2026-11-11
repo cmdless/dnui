@@ -101,8 +101,9 @@ like `{"error":{"code":"AppTypeInvalid","message":"..."}}` to stdout.
 ## 6. .NET tray client
 
 Use the minimal example in [contracts/tray-client.md](contracts/tray-client.md) from a scratch
-console app that references the Dnui project, with `RuntimePath` pointing at the built
-`Dnui.Runtime` executable.
+console app that references the Dnui project. Before packages are published, set
+`Runtime = new() { RuntimePath = "<built Dnui.Runtime executable>" }`, or use the local feed
+from section 7.
 
 Expected:
 - `StartAsync` completes once the tray is visible.
@@ -113,4 +114,25 @@ Expected:
   `Result.ExitCode` = 11 or 12.
 - Killing the runtime process from a task manager makes `Completion` return a non-zero exit
   code without throwing.
+
+## 7. Runtime download and cache
+
+Pack a runtime for this machine into the local folder feed:
+
+```bash
+dotnet build Dnui.Runtime -t:PackRuntime -p:RuntimeIdentifier=osx-arm64
+```
+
+Use your machine's RID. The package is written to `artifacts/packages/`.
+
+Run the section 6 client with `Runtime = new() { CmdlessRoot = "/tmp/cmdless-test", PackageSource = "artifacts/packages" }`.
+
+Expected:
+- First run: `/tmp/cmdless-test/dotnet/packages/cmdless.dnui.runtime.<rid>/0.1.0/` appears,
+  with `.dnui-complete` and an executable `runtime/Dnui.Runtime`. The tray shows.
+- Second run, with the feed folder renamed away: the tray still shows, and nothing is
+  downloaded.
+- Delete `.dnui-complete`, then run again: the folder is replaced with a fresh copy.
+- `CMDLESS_ROOT=/tmp/other dotnet run ...` without `CmdlessRoot` in code: the cache goes under
+  `/tmp/other/dotnet`.
 

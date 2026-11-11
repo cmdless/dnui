@@ -12,7 +12,8 @@ also set the icon, tooltip, and items; set-items and set-icon requests; item-cli
 icon-clicked notifications; shutdown when the stdio stream ends; the runtime's app-type options
 and the two-tier app model. Out of scope: the daemon helper, runtime download, the window and
 dialog commands, and per-RID packaging.) Later added: the .NET tray client is part of this
-feature.
+feature, and so are automatic runtime download and caching under `CmdlessRoot`, plus per-RID
+runtime packaging, because the platform depends on them.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -144,7 +145,8 @@ applied, the second runs its own logic, and the third exits with the documented 
 ### User Story 5 - Drive the tray from .NET with the Dnui client (Priority: P2)
 
 A .NET developer references the Dnui library and shows a tray by calling one start method with
-the runtime's location, icon, tooltip, and items. They get events when the menu opens or an
+an icon, tooltip, and items. They don't say where the runtime is: it's resolved and, if
+needed, downloaded automatically (User Story 6). They get events when the menu opens or an
 item is selected, update the menu and icon with awaitable calls, and end the tray by
 disposing it. They never deal with processes, pipes, or JSON-RPC directly.
 
@@ -177,6 +179,47 @@ standard output.
    with a "tray not running" error.
 7. **Given** a start in progress, **When** the developer's cancellation token fires, **Then**
    the runtime process is killed and start fails with a cancellation error.
+
+---
+
+### User Story 6 - The runtime is found or downloaded automatically (Priority: P1)
+
+The first time any Dnui-based app on a machine needs the runtime, the library downloads the
+exact matching runtime package for the current platform from the package feed and extracts it
+into the shared Cmdless cache. Every later use, by any app, reuses the cached copy with no
+network access. The developer never configures a path. They can optionally point at a
+different Cmdless root, a different feed, or (for development) a specific runtime executable.
+
+**Why this priority**: the rest of the platform depends on it. Without it, every consumer
+would have to ship or locate the runtime themselves, which defeats the shared cached host
+(constitution III).
+
+**Independent Test**: with an empty Cmdless root and a feed containing a runtime package for
+the current platform, resolve the runtime. Check that it's downloaded into
+`{DnuiRoot}/packages/{id}/{version}/` and that the returned path runs. Resolve again with the
+feed unreachable, and check that it succeeds from the cache.
+
+**Acceptance Scenarios**:
+
+1. **Given** an empty cache, **When** the runtime is resolved, **Then** the package for the
+   current platform at exactly the library's runtime version is downloaded, verified, and
+   extracted, and the path to an executable runtime is returned.
+2. **Given** a complete cached copy, **When** the runtime is resolved with no network, **Then**
+   it succeeds without any download.
+3. **Given** several processes resolving the same runtime at once on an empty cache, **When**
+   they all finish, **Then** the package was downloaded and extracted once, and every process
+   gets the same working path.
+4. **Given** a cache left half-extracted by a crash, or a corrupted download, **When** the
+   runtime is resolved, **Then** the broken copy is never returned. It's replaced by a fresh,
+   verified copy.
+5. **Given** `CMDLESS_ROOT` is set, or a root is passed in code, **When** the runtime is
+   resolved, **Then** the cache lives under that root. A root passed in code wins over the
+   environment variable.
+6. **Given** the current platform has no runtime package, or the package can't be found or
+   downloaded, **When** the runtime is resolved, **Then** it fails with an error that says
+   which case it is, including the package id and version.
+7. **Given** a developer passes an explicit runtime executable path, **When** a tray is
+   started, **Then** that executable is used and no resolution or download happens.
 
 ---
 
@@ -327,9 +370,10 @@ standard output.
 
 **Tray client (Dnui library)**
 
-- **FR-027**: The library MUST provide a tray client that starts the runtime, given an
-  explicit runtime executable path, with the tray command and optional app assembly and type.
-  It redirects standard input and output, and MUST NOT redirect the error stream.
+- **FR-027**: The library MUST provide a tray client that starts the runtime with the tray
+  command and optional app assembly and type. It MUST obtain the runtime through runtime
+  resolution (FR-034–FR-043) unless an explicit runtime path override is given. It redirects
+  standard input and output, and MUST NOT redirect the error stream.
 - **FR-028**: Starting MUST send initialize with the caller's icon, tooltip, and items, and
   complete only after a successful response. If the connection ends first, start MUST fail
   with an error that carries the runtime's exit code (and the standard output, if any).
@@ -346,6 +390,44 @@ standard output.
   cancellation error. After the tray has stopped running, update calls MUST fail with a
   "not running" error.
 
+**Runtime acquisition (Dnui library)**
+
+- **FR-034**: The library MUST resolve the runtime automatically. The developer MUST NOT be
+  required to supply a runtime path or root.
+- **FR-035**: Roots: `CmdlessRoot` is `~/.cmdless` unless the `CMDLESS_ROOT` environment
+  variable is set, or a root is passed in code (code wins). `DnuiRoot` is
+  `{CmdlessRoot}/dotnet`.
+- **FR-036**: The runtime package MUST be `Cmdless.Dnui.Runtime.<rid>` for the current
+  platform's RID, at exactly the library's embedded runtime version. It MUST never fall back
+  to another version.
+- **FR-037**: Packages MUST be extracted to `{DnuiRoot}/packages/{id}/{version}/`, with the full
+  package id lowercased. A cached copy is used only if it's marked complete.
+- **FR-038**: Resolution MUST work offline when a complete cached copy exists.
+- **FR-039**: Downloading and extracting MUST be serialized across processes with a lock in
+  `{DnuiRoot}/locks/`. Extraction MUST happen in a temporary location and become visible
+  atomically, so no process ever sees a partial copy.
+- **FR-040**: A downloaded package MUST be verified before use. At minimum, every archive
+  entry's checksum is checked, and the package's own manifest must name the expected id and
+  version. A failed check MUST discard the download and fail with an integrity error.
+- **FR-041**: On macOS and Linux, the runtime executable MUST be marked executable after
+  extraction.
+- **FR-042**: The package feed defaults to nuget.org. It MUST be overridable in code by a
+  NuGet v3 feed URL or by a local folder of `.nupkg` files.
+- **FR-043**: Failures MUST be distinguishable: unsupported platform, package not found on the
+  feed, download failure, integrity failure, and lock timeout. Each MUST name the package id
+  and version.
+- **FR-044**: The resolution API MUST be public, so other library features and consumers can
+  get the runtime path without starting a tray.
+
+**Runtime packaging**
+
+- **FR-045**: The build MUST be able to produce one self-contained runtime package per
+  supported RID (`win-x64`, `win-arm64`, `osx-x64`, `osx-arm64`, `linux-x64`, `linux-arm64`),
+  named `Cmdless.Dnui.Runtime.<rid>`, at version `DnuiRuntimeVersion`, with the runtime
+  executable at a fixed path inside the package.
+- **FR-046**: Publishing the packages to nuget.org is a manual release step, not part of this
+  feature. Packing them, and testing against a local folder feed, is part of it.
+
 **Platforms**
 
 - **FR-026**: All of the above MUST work on Windows, macOS, and Linux desktops that have a
@@ -358,6 +440,10 @@ standard output.
   streams. It owns all tray state.
 - **Resolved result**: the single JSON line a one-shot app writes to standard output, with its
   exit code. Sessions resolve with no result.
+- **Runtime package**: `Cmdless.Dnui.Runtime.<rid>`. It holds a self-contained runtime for one
+  platform, versioned in lockstep with the library.
+- **Cmdless root / Dnui root**: the per-user folders that hold cached packages and locks, shared
+  by every Cmdless-based app on the machine.
 - **Tray client**: the library object that owns one runtime process and its tray session. It
   exposes events, updates, completion, and disposal.
 - **Run result**: the exit code plus standard output (null when nothing was resolved). It's the
@@ -397,6 +483,12 @@ standard output.
   15 lines of their own code using the client.
 - **SC-009**: Disposing the client leaves no runtime process running in 100% of test runs,
   including when the runtime ignores end-of-file (it's killed after the timeout).
+- **SC-010**: A developer can go from referencing the library to a visible tray on a machine
+  with an empty cache with no setup steps beyond their own code (one download, then cached).
+- **SC-011**: With a cached runtime, resolution takes under 100 ms and makes no network
+  requests.
+- **SC-012**: With 10 processes resolving at once on an empty cache, the package is downloaded
+  exactly once and all 10 get a working runtime, in 100% of test runs.
 
 ## Assumptions
 
@@ -410,10 +502,13 @@ standard output.
   is acceptable. Callers aren't expected to read the error stream.
 - Linux support targets desktop environments that provide a system tray. Others get the
   documented error (FR-026).
-- The tray client takes an explicit runtime path in this feature. Finding or downloading the
-  runtime automatically is a later feature, which will add a way to start without a path.
+- Until the runtime packages are published to nuget.org, real use needs a local folder feed
+  (built by the packaging step) or the explicit runtime path override. Both are supported for
+  development and tests.
+- Private or authenticated feeds, package signature verification, and cache cleanup of old
+  versions are not in this feature.
 - Starting with the tray command is deliberate. It's the hardest command (a long-lived
   session over stdio), so it builds the shared foundation (app model, app resolution, stdio
   ownership, `Resolve`, exit codes, run result) that the window and dialog commands will reuse.
-- Out of scope: the daemon/single-instance helper, runtime download and the shared launcher,
-  `RunAsync` for one-shot commands, the window and dialog commands, and per-RID packaging.
+- Out of scope: the daemon/single-instance helper, `RunAsync` for one-shot commands, the
+  window and dialog commands, and publishing packages to nuget.org.

@@ -82,6 +82,17 @@ replaced as soon as a non-empty item list is applied.
 Notifications are sent in the order the events happened, through a single queue, and never
 block the UI thread (research R7).
 
+## Runtime cache (library side)
+
+| State of `{DnuiRoot}/packages/{id}/{version}/` | Meaning | Resolver action |
+|---|---|---|
+| missing | never downloaded | lock → download → verify → extract → publish |
+| present with `.dnui-complete` | ready | return the executable path (no lock, no network) |
+| present without the marker | left by an interrupted or old run | treated as missing, deleted under the lock |
+| `.tmp-{guid}` sibling | in-progress or crashed extraction | deleted under the lock |
+
+Details: [contracts/runtime-acquisition.md](contracts/runtime-acquisition.md).
+
 ## App type (runtime side)
 
 | Kind | Rule | Outcome |

@@ -11,7 +11,9 @@ public sealed record DnuiResult(int ExitCode, string? StdOut);
 
 public sealed class DnuiTrayOptions
 {
-    public required string RuntimePath { get; init; }   // explicit until runtime download exists
+    // Runtime resolution: CmdlessRoot, feed, or a dev RuntimePath override. Null = all defaults,
+    // so the runtime is found or downloaded automatically (contracts/runtime-acquisition.md).
+    public DnuiRuntimeOptions? Runtime { get; init; }
     public string? AppAssembly { get; init; }           // --app-assembly
     public string? AppType { get; init; }               // --app-type
     public DnuiTrayIcon? Icon { get; init; }
@@ -36,9 +38,10 @@ public sealed class DnuiTrayIcon
 
 public sealed class DnuiTray : IAsyncDisposable
 {
-    // Starts the runtime and completes after a successful initialize.
-    // Throws DnuiTrayStartException (with Result) if the runtime ends first,
-    // or OperationCanceledException (after killing the runtime) when cancelled.
+    // Resolves (and if needed downloads) the runtime, starts it, and completes after a
+    // successful initialize. Throws DnuiRuntimeUnavailableException if the runtime can't be
+    // obtained, DnuiTrayStartException (with Result) if the runtime ends first, or
+    // OperationCanceledException (after killing the runtime) when cancelled.
     public static Task<DnuiTray> StartAsync(DnuiTrayOptions options, CancellationToken ct = default);
 
     public string RuntimeVersion { get; }                // from the initialize result
@@ -78,7 +81,9 @@ public sealed class DnuiTrayNotRunningException : InvalidOperationException { }
 
 ## Behavior
 
-- **Launch**: `RuntimePath [--app-assembly A --app-type T] tray`, with stdin and stdout
+- **Resolve**: `DnuiRuntime.ResolveAsync(options.Runtime)` runs first. On a warm cache it
+  makes no network requests.
+- **Launch**: `<resolved runtime> [--app-assembly A --app-type T] tray`, with stdin and stdout
   redirected and stderr inherited (never redirected, see [cli.md](cli.md)).
 - **Framing**: newline-delimited JSON-RPC over the process streams. Notification handlers are
   registered before listening starts, so none are missed.
@@ -94,7 +99,6 @@ public sealed class DnuiTrayNotRunningException : InvalidOperationException { }
 ```csharp
 await using var tray = await DnuiTray.StartAsync(new()
 {
-    RuntimePath = runtimePath,
     Icon = DnuiTrayIcon.FromFile("icon.png"),
     Tooltip = "My App",
     Items = [new("open", "Open"), DnuiTrayItem.Separator, new("quit", "Quit")],
@@ -106,6 +110,5 @@ var result = await tray.Completion;   // ExitCode 0 after dispose
 
 ## Compatibility
 
-These types are part of the public contract (constitution V). `DnuiResult` is shared with future
-one-shot commands. `RuntimePath` becomes optional when runtime download lands, which is a
-MINOR change.
+These types are part of the public contract (constitution V). `DnuiResult` and
+`DnuiRuntimeOptions` are shared with future one-shot commands.

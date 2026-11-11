@@ -18,8 +18,12 @@ connection. After framework initialization it starts listening and drives a sing
 through `initialize`, `tray/setItems`, and `tray/setIcon`. It reports `tray/opened` (menu opening)
 and `tray/clicked` (item selection), and shows a disabled placeholder when the menu is empty,
 so the behavior is the same on every platform. It shuts down when the input stream ends. On the caller side, the library gains the `DnuiTray`
-client (start with an explicit runtime path, events, awaitable updates, a `DnuiResult`
-completion, and dispose). It's also the harness the contract tests use.
+client (start, events, awaitable updates, a `DnuiResult` completion, and dispose). It finds
+the runtime automatically through `DnuiRuntime.ResolveAsync`. That downloads
+`Cmdless.Dnui.Runtime.<rid>` at exactly `DnuiRuntimeVersion` into
+`{CmdlessRoot}/dotnet/packages/{id}/{version}/` the first time, with a cross-process lock and
+an atomic, verified extraction. A `PackRuntime` build target produces the six per-RID
+packages. It's also the harness the contract tests use.
 
 Every app gets the same output path: the runtime captures stdout before the app exists and
 sends stray console output to stderr. `DnuiApp.Resolve(result, exitCode)` is the only way to
@@ -37,8 +41,12 @@ protocol. Decisions are in
   Debug diagnostics packages. The runtime uses Avalonia.Desktop.
 - System.CommandLine 2.0.14 (runtime only).
 - StreamJsonRpc 2.26.x (library; justified in research R5).
+- No new dependency for runtime download: BCL `HttpClient`, `ZipArchive`, and
+  `File.SetUnixFileMode` (research R13).
 
-**Storage**: N/A
+**Storage**: per-user cache under `CmdlessRoot` (`~/.cmdless`, or `CMDLESS_ROOT`):
+`{DnuiRoot}/packages/{id}/{version}/` and `{DnuiRoot}/locks/`
+([contracts/runtime-acquisition.md](contracts/runtime-acquisition.md))
 
 **Testing**: xUnit v3 (`xunit.v3`, `xunit.runner.visualstudio`, `Microsoft.NET.Test.Sdk`):
 - unit tests with a fake tray host over in-memory pipes
@@ -78,13 +86,13 @@ hundred items
 | II. Library references no platform backends | PASS | Dnui has no Avalonia.Desktop; the Linux DBus probe lives in the runtime (R9) |
 | II. `DnuiApp` / `DnuiCommandApp` extension points, `Resolve`, `Stdio`, minimal public API | PASS | Public types: `DnuiApp`, `DnuiCommandApp`, `DnuiStdio`, `DnuiSession`, `DnuiStdioException`/`DnuiStdioFailure`, plus the tray client set (`DnuiTray`, `DnuiTrayOptions`, `DnuiTrayItem`, `DnuiTrayIcon`, `DnuiResult`, and three exceptions). Each is a type consumers use directly, and the tray client exists so consumers don't have to speak raw JSON-RPC (R12). The stdio types exist so takeover apps can run their own protocol, and the tray dogfoods them. Everything else is internal (R2, R6) |
 | II. New library dependency justified | PASS | StreamJsonRpc justified in R5 |
-| III. Runtime download | N/A | Out of scope |
+| III. Exact-version runtime package for the current RID, central cache, safe under concurrency, verified, root overridable, layout per 2.2.1 | PASS | R13 and [contracts/runtime-acquisition.md](contracts/runtime-acquisition.md): exact `DnuiRuntimeVersion`, lock plus atomic rename, CRC and manifest check, `CMDLESS_ROOT` and code override, `packages/{id}/{version}` |
 | IV. Cross-platform parity, documented gaps, platform adapters | PASS | macOS Dock option and Linux probe are isolated adapters; `tray/opened` uses menu opening, so it's the same on every platform (R8, R9) |
 | V. Contract documented and versioned | PASS | [contracts/](contracts/) covers the CLI, protocol, and app model; protocol version 1 |
 | V. Loaded app's Dnui version checked (SHOULD) | PASS | Exit code 13 (R3) |
 | Workflow: CLI contract tests per command | PASS | `tests/Dnui.Runtime.ContractTests` (R10) |
 | Workflow: app resolution test matrix | PASS | Default `App`, custom `DnuiCommandApp`, custom `DnuiApp`, missing assembly or type, non-`DnuiApp` (R10) |
-| Workflow: build and test on Windows, macOS, and Linux | PASS | CI matrix workflow added by this feature (Linux under `xvfb-run`) |
+| Workflow: build and test on Windows, macOS, and Linux | PASS | CI matrix workflow added by this feature (Linux under `xvfb-run`). CI also packs the six runtime packages into `artifacts/packages/`, and contract tests resolve the runtime from that folder feed |
 
 **Result**: PASS, with one justified deviation in Complexity Tracking.
 
@@ -139,7 +147,16 @@ Dnui/                              # library, package Cmdless.Dnui
 │       └── DnuiTrayExceptions.cs  # public: start / protocol / not-running exceptions
 └── Properties/AssemblyInfo.cs     # InternalsVisibleTo Dnui.Runtime, Dnui.Tests
 
-Dnui.Runtime/                      # host executable, published per RID (not in this feature)
+Dnui/Runtime/                      # runtime acquisition (public DnuiRuntime API)
+├── DnuiRuntime.cs                 # public: Version, CurrentRid, roots, ResolveAsync
+├── DnuiRuntimeOptions.cs          # public: CmdlessRoot, PackageSource, RuntimePath, LockTimeout
+├── DnuiRuntimeUnavailableException.cs
+├── PackageFeed.cs                 # v3 flat container / local folder source
+├── PackageCache.cs                # lock, verify, extract, atomic publish, exec bit
+└── RidInfo.cs                     # supported RIDs, executable name
+
+Dnui.Runtime/                      # host executable; packed per RID by the PackRuntime target
+├── Packaging/PackRuntime.targets  # publish self-contained → nuspec → artifacts/packages
 ├── Program.cs                     # sync Main: parse → resolve → SetCommand → build → start
 ├── App.axaml / App.axaml.cs       # built-in App : DnuiCommandApp
 ├── Cli/RuntimeCommandLine.cs      # System.CommandLine tree → DnuiCommand
@@ -149,7 +166,9 @@ Dnui.Runtime/                      # host executable, published per RID (not in 
                                    # (MainWindow.axaml removed; window command is future work)
 
 tests/
-├── Dnui.Tests/                    # unit + in-memory protocol tests
+├── Dnui.Tests/                    # unit + in-memory protocol tests; acquisition tests with
+│                                  #   synthetic .nupkg files in temp roots (concurrency, corrupt
+│                                  #   zip, partial cache, CMDLESS_ROOT, offline)
 ├── Dnui.Runtime.ContractTests/    # spawn runtime process; exit codes, protocol, lifecycle
 └── Dnui.TestApps/                 # custom DnuiCommandApp, DnuiApp, non-DnuiApp, spammer
 ```
