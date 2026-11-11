@@ -181,7 +181,7 @@ Argument parsing, assembly loading, and platform probes live in the runtime (res
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| Debug-only test switch in product code (`DNUI_TRAY_HOST=recording`) | Process-level contract tests must run on CI agents with no tray host. The constitution requires CLI contract tests on all three OSes. | Real-tray-only tests can't run on CI. Avalonia.Headless has no tray implementation. The switch is compiled out of Release builds, so shipped runtimes are unaffected. |
+| Debug-only test switch in product code (`DNUI_TRAY_HOST=recording`, plus `$/dnui/test/open` and `$/dnui/test/click` JSON-RPC methods for simulated menu events) | Process-level contract tests must run on CI agents with no tray host. The constitution requires CLI contract tests on all three OSes. | Real-tray-only tests can't run on CI. Avalonia.Headless has no tray implementation. The switch is compiled out of Release builds, so shipped runtimes are unaffected. |
 
 ## Post-Design Constitution Re-check
 

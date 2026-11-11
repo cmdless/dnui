@@ -31,6 +31,10 @@ Each entry records a decision, why it was made, and what else was considered.
     `sealed override OnFrameworkInitializationCompleted`.
   - The Dnui assembly declares `InternalsVisibleTo("Dnui.Runtime")` and
     `InternalsVisibleTo("Dnui.Tests")`.
+- **Platform builder options**: the library can't reference Avalonia.Native (constitution II),
+  so a command exposes hints such as `HideDockIcon`. The runtime's platform adapter applies them
+  (`.With(new MacOSPlatformOptions { ShowInDock = false })`) right before
+  `ApplyConfiguration`, which keeps the "command options before `Configure`" order.
 - **Rationale**: constitution Principle II asks for a minimal public surface. Only the runtime
   calls `SetCommand` and `ApplyConfiguration`. Applying command options before `Configure`
   lets a consumer intentionally override, for example, the hidden Dock icon.
