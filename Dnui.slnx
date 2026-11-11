@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Dnui.Runtime/Dnui.Runtime.csproj" />
+  <Project Path="Dnui/Dnui.csproj" />
+</Solution>
