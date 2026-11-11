@@ -1,4 +1,4 @@
-# Specification Quality Checklist: Host Session
+# Specification Quality Checklist: Windows and Built-in Dialogs
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-11-11
@@ -31,13 +31,15 @@
 
 ## Notes
 
-- As in spec 001, the audience is developers, and the product is a protocol plus a library. So
-  XAML windows, JSON results, and newline-delimited JSON-RPC count as contract, not
-  implementation detail. Internal mechanisms (assembly loading, dispatcher use, proxy generation)
-  are left to the plan.
-- No clarifications were needed. Defaults are recorded in Assumptions:
-  - parenting is in-process only
-  - dialogs on the same window are queued
-  - a window crash closes only that window
-  - the protocol is reshaped without a compatibility layer, since 0.1.0 is unreleased
+- Rewritten 2026-11-11 after design discussion. There's no shared host: host commands versus window
+  commands (constitution 2.3.0), one-shot windows with no protocol, and only the built-in pickers
+  (open file, open folder, save file). The message box and other kinds are deferred.
+- As in spec 001, the audience is developers, and the product is a CLI contract plus a library.
+  So XAML windows, JSON result lines, and option names count as contract, not implementation
+  detail. Exact option spelling is left to the plan's CLI contract.
+- No clarifications were needed. Defaults are recorded in Assumptions and Edge Cases:
+  - a missing start folder falls back to the platform default
+  - results are always lists for the open dialogs
+  - parented dialogs are queued
+  - child windows must be types already loaded in the window's process
 - Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`
