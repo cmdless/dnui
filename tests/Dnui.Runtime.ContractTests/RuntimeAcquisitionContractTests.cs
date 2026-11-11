@@ -9,7 +9,7 @@ public class RuntimeAcquisitionContractTests
     [Fact]
     public async Task ResolveFromLocalFeed_InstallsRunnableRuntime()
     {
-        Assert.SkipUnless(TestPaths.HasPackageForCurrentRid, $"Run PackRuntime for {DnuiRuntime.CurrentRid} first.");
+        Assert.SkipUnless(TestPaths.HasPackageForCurrentRid, $"Run PackRuntime for {DnuiRuntime.CurrentRid} first (the local package is missing or older than the runtime build).");
         using var root = new TempDir();
 
         var exe = await DnuiRuntime.ResolveAsync(new() { CmdlessRoot = root.Path, PackageSource = TestPaths.PackagesFeed });
@@ -31,7 +31,7 @@ public class RuntimeAcquisitionContractTests
     [Fact]
     public async Task TrayClient_DownloadsAndStarts_TenAtOnce()
     {
-        Assert.SkipUnless(TestPaths.HasPackageForCurrentRid, $"Run PackRuntime for {DnuiRuntime.CurrentRid} first.");
+        Assert.SkipUnless(TestPaths.HasPackageForCurrentRid, $"Run PackRuntime for {DnuiRuntime.CurrentRid} first (the local package is missing or older than the runtime build).");
         using var root = new TempDir();
         var host = new DnuiHost(new() { Runtime = new() { CmdlessRoot = root.Path, PackageSource = TestPaths.PackagesFeed }, Headless = true });
         var options = new DnuiTrayOptions { Items = [new("open", "Open")] };

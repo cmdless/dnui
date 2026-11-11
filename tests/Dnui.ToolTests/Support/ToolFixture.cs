@@ -40,9 +40,13 @@ public sealed class ToolFixture : IAsyncLifetime
         var rid = RuntimeInformation.RuntimeIdentifier;
         var runtimePackage = $"Cmdless.Dnui.Runtime.{rid}.{Version}.nupkg";
         var packed = Path.Combine(RepoRoot, "artifacts", "packages", runtimePackage);
-        if (!File.Exists(packed))
+        if (!IsCurrent(packed))
         {
-            await RunChecked("dotnet", ["build", Path.Combine(RepoRoot, "Dnui.Runtime"), "-t:PackRuntime", $"-p:RuntimeIdentifier={rid}"]);
+            // Missing or older than the runtime build: pack a private copy, so the tool never installs
+            // stale runtime code and nothing shared is rewritten while other test projects read it.
+            var artifacts = Path.Combine(Root, "artifacts");
+            await RunChecked("dotnet", ["build", Path.Combine(RepoRoot, "Dnui.Runtime"), "-t:PackRuntime", $"-p:RuntimeIdentifier={rid}", $"-p:DnuiArtifactsDir={artifacts}"]);
+            packed = Path.Combine(artifacts, "packages", runtimePackage);
         }
 
         File.Copy(packed, Path.Combine(Feed, runtimePackage));
@@ -57,6 +61,27 @@ public sealed class ToolFixture : IAsyncLifetime
     {
         try { Directory.Delete(Root, recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         return ValueTask.CompletedTask;
+    }
+
+    /// <summary>
+    /// A local runtime package is current when it is newer than the runtime and library binaries the
+    /// tests were built with (the runtime build output is the reference).
+    /// </summary>
+    public static bool IsCurrent(string package)
+    {
+        if (!File.Exists(package))
+        {
+            return false;
+        }
+
+        var built = Path.GetDirectoryName(RuntimeExe)!;
+        var newestBinary = new[] { "Dnui.Runtime.dll", "Dnui.dll" }
+            .Select(name => Path.Combine(built, name))
+            .Where(File.Exists)
+            .Select(File.GetLastWriteTimeUtc)
+            .DefaultIfEmpty(DateTime.MinValue)
+            .Max();
+        return File.GetLastWriteTimeUtc(package) >= newestBinary;
     }
 
     /// <summary>A fresh CMDLESS_ROOT with the feed as the package source.</summary>
