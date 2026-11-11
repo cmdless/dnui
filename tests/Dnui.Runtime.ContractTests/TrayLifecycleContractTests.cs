@@ -53,8 +53,26 @@ public class TrayLifecycleContractTests
         await runtime.RequestAsync("initialize", new { protocolVersion = 1, items = new[] { new { id = "a", text = "A" } } });
 
         runtime.CloseStdoutReader();
-        await runtime.SendAsync("tray/simulateClick", new { id = "a" });
+
+        // The runtime notices a gone reader on its next failed write. On Windows the handle stays
+        // open until the harness's pending read completes, so the first write can still succeed
+        // (it satisfies that read). Keep writing until one fails and the runtime exits.
+        for (var attempt = 0; attempt < 25 && !runtime.HasExited; attempt++)
+        {
+            try
+            {
+                await runtime.SendAsync("tray/simulateClick", new { id = "a" });
+            }
+            catch (IOException)
+            {
+                break; // stdin already closed by the exiting runtime
+            }
+
+            await Task.Delay(200);
+        }
+
         await runtime.WaitForExitAsync();
         Assert.True(runtime.HasExited);
+        Assert.Contains("a write to stdout failed", runtime.StdErr);
     }
 }
