@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <!-- Single source of truth for the runtime version. Dnui.Runtime builds with this version,
+         and the Dnui library embeds it as assembly metadata so it can resolve the matching
+         Cmdless.Dnui.Runtime.<rid> package at runtime. -->
+    <DnuiRuntimeVersion>0.1.0</DnuiRuntimeVersion>
+    <!-- Lockstep versioning (constitution V): every project ships at DnuiRuntimeVersion. -->
+    <Version>$(DnuiRuntimeVersion)</Version>
+    <!-- Shared by Dnui and Dnui.Runtime. App assemblies are loaded into the runtime, so both
+         MUST build against the same Avalonia version. -->
+    <AvaloniaVersion>12.1.5</AvaloniaVersion>
+  </PropertyGroup>
+</Project>

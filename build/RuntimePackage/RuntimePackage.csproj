@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Packs a self-contained runtime publish folder as Cmdless.Dnui.Runtime.<rid> (research R14).
+       Invoked by Dnui.Runtime's PackRuntime target; not part of the solution. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <NoWarn>$(NoWarn);NU5100;NU5128</NoWarn>
+    <NuspecFile>$(MSBuildThisFileDirectory)Cmdless.Dnui.Runtime.nuspec</NuspecFile>
+    <!-- DnuiRid and DnuiPublishDir come from PackRuntime; the version from Directory.Build.props. -->
+    <NuspecProperties>id=Cmdless.Dnui.Runtime.$(DnuiRid);version=$(DnuiRuntimeVersion);rid=$(DnuiRid)</NuspecProperties>
+    <!-- File sources are relative to the publish folder, so package paths never depend on how
+         NuGet splits an absolute wildcard path (it nested them under runtime/<rid>/ on Windows). -->
+    <NuspecBasePath>$(DnuiPublishDir)</NuspecBasePath>
+  </PropertyGroup>
+</Project>
