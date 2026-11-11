@@ -63,7 +63,7 @@ public enum DnuiRuntimeFailure
 | `CmdlessRoot` | `CmdlessRoot` option → `CMDLESS_ROOT` env var → `~/.cmdless` (`Environment.SpecialFolder.UserProfile`) |
 | `DnuiRoot` | `{CmdlessRoot}/dotnet` |
 | `{DnuiRoot}/packages/{id}/{version}/` | Extracted package. `{id}` is the full lowercased package id, for example `cmdless.dnui.runtime.osx-arm64` |
-| `{DnuiRoot}/packages/{id}/{version}/.dnui-complete` | Marker written last. A folder without it is treated as absent |
+| `{DnuiRoot}/packages/{id}/{version}/.dnui-complete` | Install marker, written last after verification succeeds. Its presence alone means "installed": nothing is re-verified on later resolutions. A folder without it is treated as absent |
 | `{DnuiRoot}/packages/{id}/.tmp-{guid}/` | Extraction in progress. Renamed to `{version}` when complete |
 | `{DnuiRoot}/locks/{id}.{version}.lock` | Cross-process lock file |
 
@@ -87,7 +87,9 @@ Any other RID (for example `linux-musl-x64`) → `UnsupportedPlatform`.
 
 1. If `RuntimePath` is set, return it. It must exist; otherwise `PackageNotFound`.
 2. Work out the RID and package id. An unsupported RID → `UnsupportedPlatform`.
-3. If `{version}/.dnui-complete` exists → return the executable path. No lock, no network.
+3. If `{version}/.dnui-complete` exists → return the executable path. No lock, no network,
+   and no verification: checks run only during installation (steps 7–8), never on this warm
+   path.
 4. Acquire `locks/{id}.{version}.lock`, waiting up to `LockTimeout` (cancellable).
 5. Check again for the complete marker. Another process may have finished meanwhile.
 6. Download the `.nupkg`. For a URL source, use the feed's `PackageBaseAddress` flat container,

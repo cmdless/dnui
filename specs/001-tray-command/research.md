@@ -288,7 +288,11 @@ Each entry records a decision, why it was made, and what else was considered.
   justified) for one flat-container download and a zip extract.
 - **Integrity scope**: CRC plus manifest checks catch truncated or corrupted downloads and
   wrong packages. They don't defend against a malicious feed. Repository-signature or
-  SHA-512 catalog verification is a later hardening step, recorded as an open item.
+  SHA-512 verification is a later hardening step, confirmed with the user (2026-11-11).
+- **Verification cost**: checks run once, at install time. The `.dnui-complete` marker is
+  written only after they pass, and later resolutions only test that the marker exists (one
+  `File.Exists`), so the warm path stays fast (SC-011). A forced reinstall option is planned
+  for later.
 - **Alternatives**: `dotnet tool`-style installation, or shelling out to `nuget`/`dotnet`.
   Rejected: consumers can't be assumed to have an SDK, and it's slow. NuGet.Protocol:
   rejected for size, as above.

@@ -406,6 +406,9 @@ feed unreachable, and check that it succeeds from the cache.
 - **FR-039**: Downloading and extracting MUST be serialized across processes with a lock in
   `{DnuiRoot}/locks/`. Extraction MUST happen in a temporary location and become visible
   atomically, so no process ever sees a partial copy.
+- **FR-039a**: Installation MUST end by writing a marker file inside the extracted folder. The
+  marker's presence is the only "installed" check on later resolutions: the warm path MUST NOT
+  re-verify, re-hash, or scan the extracted files. A forced reinstall is a later addition.
 - **FR-040**: A downloaded package MUST be verified before use. At minimum, every archive
   entry's checksum is checked, and the package's own manifest must name the expected id and
   version. A failed check MUST discard the download and fail with an integrity error.
@@ -505,8 +508,9 @@ feed unreachable, and check that it succeeds from the cache.
 - Until the runtime packages are published to nuget.org, real use needs a local folder feed
   (built by the packaging step) or the explicit runtime path override. Both are supported for
   development and tests.
-- Private or authenticated feeds, package signature verification, and cache cleanup of old
-  versions are not in this feature.
+- Private or authenticated feeds, stronger verification (SHA-512 against the feed, or package
+  signature checks), forced reinstall, and cache cleanup of old versions are not in this
+  feature. They're planned hardening steps.
 - Starting with the tray command is deliberate. It's the hardest command (a long-lived
   session over stdio), so it builds the shared foundation (app model, app resolution, stdio
   ownership, `Resolve`, exit codes, run result) that the window and dialog commands will reuse.
