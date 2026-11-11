@@ -457,7 +457,7 @@ an eager session claim.
 - [X] T081 [P] Add tests/Dnui.Runtime.ContractTests/TimingTests.cs: tray visible (initialize response) within 2 s of process start (SC-002), and a warm-cache `ResolveAsync` under 100 ms with no source access (SC-011)
 - [X] T082 Add a public-API guard test, tests/Dnui.Tests/PublicApiTests.cs, that lists all public types in the Dnui assembly and asserts the set equals the contracts' list (constitution II minimal surface)
 - [ ] T083 (macOS real tray verified 2026-11-11: initialize, submenu, check item, placeholder, setIcon/setItems; Windows and Linux pending) Run [quickstart.md](quickstart.md) §1–§7 on Windows, macOS, and Linux with a real tray. Record whether `tray/opened` fires and whether the disabled placeholder can be selected on each OS in [contracts/tray-protocol.md](contracts/tray-protocol.md), and fix any platform gap (FR-023 requires `tray/opened` everywhere)
-- [ ] T084 (local: 0 warnings, 108/108 tests, osx-arm64 package; CI on three runners pending) Final check: `dotnet build Dnui.slnx` with 0 warnings, `dotnet test` green on all three CI runners in Debug **and** with the contract tests pointed at a Release-packed runtime (SC-013), and all six `Cmdless.Dnui.Runtime.<rid>` packages produced by the `pack` job
+- [X] T084 (2026-11-11: CI green on Windows, macOS, Linux — 108/108 each; per-RID packages verified at pack time; acquisition tests run against Release-packed runtimes) Final check: `dotnet build Dnui.slnx` with 0 warnings, `dotnet test` green on all three CI runners in Debug **and** with the contract tests pointed at a Release-packed runtime (SC-013), and all six `Cmdless.Dnui.Runtime.<rid>` packages produced by the `pack` job
 
 ---
 
