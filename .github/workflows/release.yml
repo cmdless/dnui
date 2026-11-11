@@ -1,0 +1,52 @@
+name: release
+
+# Release = push a tag matching DnuiRuntimeVersion, e.g. `git tag v0.1.0 && git push origin v0.1.0`.
+# "Run workflow" (manual) does a dry run: packs and uploads artifacts, creates no release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Read DnuiRuntimeVersion
+        id: version
+        run: echo "version=$(dotnet msbuild Dnui/Dnui.csproj -getProperty:DnuiRuntimeVersion)" >> "$GITHUB_OUTPUT"
+
+      - name: Tag must match DnuiRuntimeVersion (lockstep versioning)
+        if: github.ref_type == 'tag'
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "v${{ steps.version.outputs.version }}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match DnuiRuntimeVersion ${{ steps.version.outputs.version }} (expected v${{ steps.version.outputs.version }})."
+            exit 1
+          fi
+
+      - name: Pack runtime packages for every RID
+        run: |
+          for rid in win-x64 win-arm64 osx-x64 osx-arm64 linux-x64 linux-arm64; do
+            dotnet build Dnui.Runtime -t:PackRuntime -p:RuntimeIdentifier=$rid
+          done
+
+      - name: Pack library
+        run: dotnet pack Dnui/Dnui.csproj -c Release -o artifacts/packages
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ steps.version.outputs.version }}
+          path: artifacts/packages/*.nupkg
+
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" artifacts/packages/*.nupkg --title "${GITHUB_REF_NAME}" --generate-notes

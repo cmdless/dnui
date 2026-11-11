@@ -320,7 +320,8 @@ Each entry records a decision, why it was made, and what else was considered.
   (`Cmdless.Dnui.Runtime.<rid>`, version `$(DnuiRuntimeVersion)`) with the publish output
   under `runtime/`. The output goes to `artifacts/packages/`, which doubles as the local
   folder feed for tests and development.
-  - CI packs all six RIDs. Each RID can be cross-published from any OS, because no native
+  - The tag-triggered release workflow (`.github/workflows/release.yml`) packs all six RIDs;
+    regular CI packs only the runner's RID for the acquisition tests. Each RID can be cross-published from any OS, because no native
     compilation is involved.
   - Publishing settings: `SelfContained=true`, `PublishSingleFile=false` (Avalonia native
     libraries load more reliably from a folder), `PublishTrimmed=false` (app assemblies loaded
@@ -352,4 +353,10 @@ Each entry records a decision, why it was made, and what else was considered.
   menu and replace its items).
 - **Packaging project** lives in `build/RuntimePackage/` (outside `Dnui.Runtime/`) so its build
   output can't be picked up by the runtime project's globs.
+- **Release process** (user decision, 2026-11-11): `main` is the integration branch and never
+  deploys. `ci.yml` runs tests on pull requests and pushes to `main`, and skips changes to docs
+  and specs only. A release happens only when a `v*` tag is pushed. `release.yml` fails unless the
+  tag equals `v{DnuiRuntimeVersion}`, packs all six runtime packages plus the library, and
+  attaches them to a GitHub Release. Publishing to nuget.org is a later step, behind an
+  approval-gated environment.
 
