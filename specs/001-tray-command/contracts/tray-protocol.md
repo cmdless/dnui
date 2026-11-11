@@ -87,9 +87,9 @@ is always written before the response.
 
 Sends `tray/clicked {"id":"open"}` exactly as a real selection would, then responds `{}`. It
 follows the same rules as a user: an unknown id, a disabled item, a separator, or a submenu
-parent → -32012. While the placeholder is shown, there's nothing selectable.
+parent → 1012. While the placeholder is shown, there's nothing selectable.
 
-All three methods require `initialize` first (-32001), and work the same with or without
+All three methods require `initialize` first (1001), and work the same with or without
 `--headless`.
 
 ### Menu item and icon shapes
@@ -116,16 +116,18 @@ See [data-model.md](../data-model.md) (MenuItem, Icon).
 ## Errors
 
 Standard JSON-RPC errors (-32700 parse error, -32600 invalid request, -32601 method not
-found, -32602 invalid params) apply. Application errors:
+found, -32602 invalid params) apply. Application errors use codes 1001–1099, outside JSON-RPC's
+reserved range (-32768 to -32000), where libraries such as StreamJsonRpc assign their own
+meanings:
 
 | Code | Name | When | `data` |
 |---|---|---|---|
-| -32001 | NotInitialized | `tray/*` request before `initialize` | — |
-| -32002 | AlreadyInitialized | second `initialize` | — |
-| -32003 | ProtocolVersionMismatch | `initialize.protocolVersion` ≠ 1 | `{"requested":n,"supported":[1]}` |
-| -32010 | InvalidItems | validation failure (data-model rules) | `{"path":"items[1]","id":"x","reason":"duplicate-id"}` |
-| -32011 | InvalidIcon | icon unreadable, ambiguous, or undecodable | `{"reason":"..."}` |
-| -32012 | InvalidSimulation | `tray/simulateClick` target is unknown, disabled, a separator, or a submenu parent | `{"id":"x","reason":"unknown" \| "disabled" \| "separator" \| "parent"}` |
+| 1001 | NotInitialized | `tray/*` request before `initialize` | — |
+| 1002 | AlreadyInitialized | second `initialize` | — |
+| 1003 | ProtocolVersionMismatch | `initialize.protocolVersion` ≠ 1 | `{"requested":n,"supported":[1]}` |
+| 1010 | InvalidItems | validation failure (data-model rules) | `{"path":"items[1]","id":"x","reason":"duplicate-id"}` |
+| 1011 | InvalidIcon | icon unreadable, ambiguous, or undecodable | `{"reason":"..."}` |
+| 1012 | InvalidSimulation | `tray/simulateClick` target is unknown, disabled, a separator, or a submenu parent | `{"id":"x","reason":"unknown" \| "disabled" \| "separator" \| "parent"}` |
 
 A malformed message never crashes the runtime. If a request id can be recovered, an error
 response is sent.

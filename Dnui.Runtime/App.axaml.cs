@@ -1,23 +1,12 @@
-using Avalonia;
-using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 
 namespace Dnui.Runtime;
 
-public partial class App : Application
+/// <summary>The built-in app: runs the command chosen on the command line.</summary>
+public partial class App : DnuiCommandApp
 {
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
-    }
-
-    public override void OnFrameworkInitializationCompleted()
-    {
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            desktop.MainWindow = new MainWindow();
-        }
-
-        base.OnFrameworkInitializationCompleted();
     }
 }

@@ -63,7 +63,7 @@ public sealed class DnuiTray : IAsyncDisposable
     // Always available; intended for consumers' automated tests and diagnostics.
     public Task<DnuiTrayState> GetStateAsync(CancellationToken ct = default);
     public Task SimulateOpenAsync(CancellationToken ct = default);   // Opened is raised before this completes
-    public Task SimulateClickAsync(string id, CancellationToken ct = default);   // -32012 → DnuiTrayProtocolException
+    public Task SimulateClickAsync(string id, CancellationToken ct = default);   // 1012 → DnuiTrayProtocolException
 
     // Completes when the runtime exits, for any reason. Never faults for a non-zero exit code.
     public Task<DnuiResult> Completion { get; }
@@ -81,7 +81,7 @@ public sealed class DnuiTrayStartException : Exception
 
 public sealed class DnuiTrayProtocolException : Exception
 {
-    public int Code { get; }                             // e.g. -32010 InvalidItems
+    public int Code { get; }                             // e.g. 1010 InvalidItems
     public System.Text.Json.JsonElement? Data { get; }
 }
 

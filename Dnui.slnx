@@ -1,4 +1,9 @@
 <Solution>
+  <Folder Name="/tests/">
+    <Project Path="tests/Dnui.Runtime.ContractTests/Dnui.Runtime.ContractTests.csproj" />
+    <Project Path="tests/Dnui.TestApps/Dnui.TestApps.csproj" />
+    <Project Path="tests/Dnui.Tests/Dnui.Tests.csproj" />
+  </Folder>
   <Project Path="Dnui.Runtime/Dnui.Runtime.csproj" />
   <Project Path="Dnui/Dnui.csproj" />
 </Solution>

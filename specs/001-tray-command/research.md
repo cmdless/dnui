@@ -226,7 +226,7 @@ Each entry records a decision, why it was made, and what else was considered.
 - **Simulation semantics**: `simulateOpen` and `simulateClick` call the same `TrayNotifier`
   path that host events use, and wait until the notification has been written before
   responding. `simulateClick` checks the target against the current state using the user's
-  rules (enabled leaf only), else -32012 `InvalidSimulation`. Both work in headless and real
+  rules (enabled leaf only), else 1012 `InvalidSimulation`. Both work in headless and real
   mode. The earlier Debug-only `DNUI_TRAY_HOST` and `$/dnui/test/*` design was dropped at the
   user's request (2026-11-11), because always-on public features are simpler and more useful.
 - **Alternatives**: Avalonia.Headless. It has no tray platform implementation, so it can't
@@ -291,8 +291,9 @@ Each entry records a decision, why it was made, and what else was considered.
     `.dnui-complete` last, then `Directory.Move` it to `{version}`. A rename within one
     folder is atomic on every supported OS. Leftover `.tmp-*` folders are deleted while
     holding the lock.
-  - **Verify**: open the archive and read every entry to the end, which makes `ZipArchive`
-    validate each CRC-32. Parse the `.nuspec` and require an exact id and version match.
+  - **Verify**: compute each entry's CRC-32 and compare it with the value recorded in the
+    archive. `ZipArchive` doesn't check it while reading, as found during implementation. Parse
+    the `.nuspec` and require an exact id and version match.
   - **Executable bit**: `File.SetUnixFileMode(exe, UserRead|UserWrite|UserExecute|GroupRead|GroupExecute|OtherRead|OtherExecute)`
     on macOS and Linux. Downloads through `HttpClient` don't get the macOS quarantine
     attribute, so Gatekeeper doesn't block the extracted runtime.
@@ -329,4 +330,26 @@ Each entry records a decision, why it was made, and what else was considered.
 - **Alternatives**: a separate packaging `.csproj` per RID (six near-identical projects), or
   `dotnet pack` with `RuntimeIdentifiers` (NuGet's built-in per-RID packing produces one
   package with `runtimes/<rid>/`, not separate packages).
+
+## R15. Findings during implementation
+
+- **Protocol error codes** moved from -32001…-32012 to **1001–1012**. JSON-RPC reserves -32768
+  to -32000, and StreamJsonRpc gives some of those codes its own meaning (-32003 is "response
+  serialization failure"), which broke the .NET client.
+- **End of input drains first.** StreamJsonRpc closes the whole connection at end-of-input, which
+  dropped responses to requests a caller wrote just before closing stdin. stdin is wrapped
+  (`DrainOnEndOfInputStream`) so end-of-input is reported only once in-flight requests and queued
+  notifications are written.
+- **Broken stdout.** .NET console streams silently ignore broken-pipe errors. When stdout is
+  redirected, `DnuiStdio` opens the raw stdout handle as a `FileStream` instead, and the tray
+  wraps it (`WriteFailureStream`) so the first failed write resolves the session (exit 0)
+  without waiting for stdin.
+- **Client simulate ordering.** StreamJsonRpc may process a notification after the response that
+  follows it, so `SimulateOpenAsync`/`SimulateClickAsync` wait for the matching event to be
+  raised instead of relying on message order.
+- **Real macOS tray** (headless mode can't catch these): Avalonia.Native throws on a null tooltip
+  (always pass a string) and rejects replacing `TrayIcon.Menu` with a new `NativeMenu` (keep one
+  menu and replace its items).
+- **Packaging project** lives in `build/RuntimePackage/` (outside `Dnui.Runtime/`) so its build
+  output can't be picked up by the runtime project's globs.
 

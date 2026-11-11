@@ -148,7 +148,7 @@ Dnui/                              # library, package Cmdless.Dnui
 │       └── DnuiTrayExceptions.cs  # public: start / protocol / not-running exceptions
 └── Properties/AssemblyInfo.cs     # InternalsVisibleTo Dnui.Runtime, Dnui.Tests
 
-Dnui/Runtime/                      # runtime acquisition (public DnuiRuntime API)
+Dnui/Runtime/                      # runtime acquisition (public DnuiRuntime API; internals in namespace Dnui.Acquisition)
 ├── DnuiRuntime.cs                 # public: Version, CurrentRid, roots, ResolveAsync
 ├── DnuiRuntimeOptions.cs          # public: CmdlessRoot, PackageSource, RuntimePath, LockTimeout
 ├── DnuiRuntimeUnavailableException.cs
@@ -157,7 +157,7 @@ Dnui/Runtime/                      # runtime acquisition (public DnuiRuntime API
 └── RidInfo.cs                     # supported RIDs, executable name
 
 Dnui.Runtime/                      # host executable; packed per RID by the PackRuntime target
-├── Packaging/PackRuntime.targets  # publish self-contained → nuspec → artifacts/packages
+├── Packaging/PackRuntime.targets  # publish self-contained → pack build/RuntimePackage → artifacts/packages
 ├── Program.cs                     # sync Main: parse → resolve → SetCommand → build → start
 ├── App.axaml / App.axaml.cs       # built-in App : DnuiCommandApp
 ├── Cli/RuntimeCommandLine.cs      # System.CommandLine tree → DnuiCommand

@@ -49,7 +49,7 @@ Update the menu:
 echo '{"jsonrpc":"2.0","id":2,"method":"tray/setItems","params":{"items":[{"id":"a","text":"A"},{"id":"a","text":"Dup"}]}}' >&3
 ```
 
-Expected: error `-32010` naming duplicate id `a`. The menu is unchanged.
+Expected: error `1010` naming duplicate id `a`. The menu is unchanged.
 
 Clear the menu:
 
@@ -154,7 +154,7 @@ Expected, in order:
 - the `initialize` result
 - `tray/opened`, then response 2
 - `tray/clicked {"id":"open"}`, then response 3
-- error -32012 with reason `disabled`
+- error 1012 with reason `disabled`
 - the state: `visible:false`, since there's no icon; the two items
 - exit 0
 

@@ -5,6 +5,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>Cmdless.Dnui</PackageId>
+    <Description>Cross-platform UI through a cached, per-platform Avalonia runtime. Show a tray (and more) from any .NET app with no UI framework dependency on your side.</Description>
+    <Authors>Cmdless</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,6 +25,7 @@
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="StreamJsonRpc" Version="2.26.150" />
   </ItemGroup>
 
 </Project>

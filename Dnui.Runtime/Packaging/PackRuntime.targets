@@ -1,0 +1,24 @@
+<Project>
+  <!--
+    dotnet build Dnui.Runtime -t:PackRuntime -p:RuntimeIdentifier=<rid>
+    Publishes a self-contained runtime for <rid> and packs it as
+    artifacts/packages/Cmdless.Dnui.Runtime.<rid>.<DnuiRuntimeVersion>.nupkg (research R14).
+  -->
+  <PropertyGroup>
+    <DnuiArtifactsDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../artifacts'))</DnuiArtifactsDir>
+  </PropertyGroup>
+
+  <Target Name="PackRuntime">
+    <Error Condition="'$(RuntimeIdentifier)' == ''" Text="PackRuntime requires -p:RuntimeIdentifier=&lt;rid&gt;." />
+
+    <PropertyGroup>
+      <_DnuiPublishDir>$(DnuiArtifactsDir)/runtime/$(RuntimeIdentifier)/</_DnuiPublishDir>
+      <_DnuiPackageId>Cmdless.Dnui.Runtime.$(RuntimeIdentifier)</_DnuiPackageId>
+    </PropertyGroup>
+
+    <RemoveDir Directories="$(_DnuiPublishDir)" />
+    <Exec Command="dotnet publish &quot;$(MSBuildProjectFullPath)&quot; -c Release -r $(RuntimeIdentifier) --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=false -o &quot;$(_DnuiPublishDir)&quot;" />
+    <Exec Command="dotnet pack &quot;$(MSBuildThisFileDirectory)../../build/RuntimePackage/RuntimePackage.csproj&quot; -c Release -o &quot;$(DnuiArtifactsDir)/packages&quot; -p:DnuiRid=$(RuntimeIdentifier) -p:DnuiPublishDir=&quot;$(_DnuiPublishDir)&quot;" />
+    <Message Importance="high" Text="Packed $(_DnuiPackageId) $(DnuiRuntimeVersion) into $(DnuiArtifactsDir)/packages" />
+  </Target>
+</Project>
