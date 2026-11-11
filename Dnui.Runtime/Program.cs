@@ -1,5 +1,8 @@
 using Avalonia;
 using Dnui.Commands;
+using Dnui.Dialogs;
+using Dnui.Internal;
+using Dnui.Windows;
 using Dnui.Runtime.Cli;
 using Dnui.Runtime.Hosting;
 using Dnui.Runtime.Platform;
@@ -14,13 +17,29 @@ internal static class Program
     [STAThread]
     public static int Main(string[] args)
     {
-        var cli = RuntimeCommandLine.Parse(args);
+        RuntimeInvocation cli;
+        try
+        {
+            cli = RuntimeCommandLine.Parse(args);
+        }
+        catch (Exception ex)
+        {
+            // Never crash on bad input: report it like any unexpected failure.
+            Console.Error.WriteLine(ex);
+            return RuntimeFailure.Fail(DnuiStdio.CreateFromConsole(), sessionRequested: false, ExitCodes.Unexpected, ex.Message);
+        }
+
         if (cli.IsHelpOrVersion)
         {
             return cli.ParseResult.Invoke();
         }
 
         var stdio = DnuiStdio.CreateFromConsole();
+        if (OperatingSystem.IsMacOS())
+        {
+            DnuiPlatformHooks.BringToFront = MacForeground.Activate;
+        }
+
         try
         {
             return Run(cli, stdio);
@@ -56,8 +75,20 @@ internal static class Program
             }
 
             command = CreateCommand(cli);
+            if (cli.CommandName == RuntimeCommandLine.WindowCommandName && cli.Headless)
+            {
+                HeadlessOutcomes.Enable(cli.DialogOutcomes);
+            }
+
             if (command.Prepare(commandApp) is { } abortCode)
             {
+                // A one-shot command may have resolved its outcome (or an error) already.
+                if (app.PendingResolution is { } early)
+                {
+                    app.WriteResult(early.Result);
+                    return early.ExitCode;
+                }
+
                 return abortCode;
             }
 
@@ -81,7 +112,7 @@ internal static class Program
             return pending.ExitCode;
         }
 
-        var builder = AppBuilder.Configure(() => app).UsePlatformDetect();
+        var builder = HeadlessPlatform.Use(AppBuilder.Configure(() => app), cli);
         if (command is not null)
         {
             PlatformCommandOptions.Apply(builder, command);
@@ -121,6 +152,8 @@ internal static class Program
     private static DnuiCommand CreateCommand(RuntimeInvocation cli) => cli.CommandName switch
     {
         RuntimeCommandLine.TrayCommandName => new TrayCommand(cli.Headless),
+        RuntimeCommandLine.WindowCommandName => new WindowCommand(cli.WindowAssembly!, cli.WindowType!),
+        RuntimeCommandLine.DialogCommandName => new DialogCommand(cli.DialogKind!.Value, cli.DialogOptions!, cli.Headless, cli.Outcome),
         _ => throw new InvalidOperationException($"Unknown command '{cli.CommandName}'."),
     };
 

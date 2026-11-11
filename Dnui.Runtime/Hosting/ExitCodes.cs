@@ -10,9 +10,14 @@ internal static class ExitCodes
     public const int AppTypeNotFound = 11;
     public const int AppTypeInvalid = 12;
     public const int DnuiVersionMismatch = 13;
+    public const int WindowAssemblyLoadFailed = Dnui.Internal.ErrorResults.WindowAssemblyLoadFailed;
+    public const int WindowTypeNotFound = Dnui.Internal.ErrorResults.WindowTypeNotFound;
+    public const int WindowTypeInvalid = Dnui.Internal.ErrorResults.WindowTypeInvalid;
+    public const int WindowFailed = Dnui.Internal.ErrorResults.WindowFailed;
     public const int TrayNotRedirected = 20;
     public const int TrayHostUnavailable = 21;
     public const int TrayStdioAlreadyClaimed = 22;
+    public const int DialogUnsupported = Dnui.Internal.ErrorResults.DialogUnsupported;
 
     public static string NameOf(int code) => code switch
     {
@@ -22,6 +27,6 @@ internal static class ExitCodes
         AppTypeNotFound => "AppTypeNotFound",
         AppTypeInvalid => "AppTypeInvalid",
         DnuiVersionMismatch => "DnuiVersionMismatch",
-        _ => "Unexpected",
+        _ => Dnui.Internal.ErrorResults.NameOf(code),
     };
 }

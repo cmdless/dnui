@@ -64,7 +64,9 @@ internal sealed class RuntimeProcess : IAsyncDisposable
 
     public int ProcessId => _process.Id;
 
-    public static RuntimeProcess Start(params string[] args)
+    public static RuntimeProcess Start(params string[] args) => StartWithEnv(null, args);
+
+    public static RuntimeProcess StartWithEnv(IReadOnlyDictionary<string, string?>? env, params string[] args)
     {
         var info = new ProcessStartInfo(TestPaths.RuntimeExe)
         {
@@ -80,7 +82,21 @@ internal sealed class RuntimeProcess : IAsyncDisposable
             info.ArgumentList.Add(arg);
         }
 
+        foreach (var (key, value) in env ?? new Dictionary<string, string?>())
+        {
+            if (value is null) info.Environment.Remove(key); else info.Environment[key] = value;
+        }
+
         return new RuntimeProcess(Process.Start(info)!);
+    }
+
+    /// <summary>Runs a one-shot command to completion and returns (exit code, stdout lines, stderr).</summary>
+    public static async Task<(int ExitCode, List<string> StdOut, string StdErr)> RunAsync(IReadOnlyDictionary<string, string?>? env, params string[] args)
+    {
+        await using var process = StartWithEnv(env, args);
+        process.CloseStdin();
+        var code = await process.WaitForExitAsync(30_000);
+        return (code, process.AllStdOut, process.StdErr);
     }
 
     public static string[] WithTestApp(string type, params string[] args) =>

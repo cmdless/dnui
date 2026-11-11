@@ -22,6 +22,8 @@ public class VersionMismatchContractTests
     }
 
     /// <summary>Emits a minimal library whose only notable content is an AssemblyRef to Dnui at <paramref name="dnuiVersion"/>.</summary>
+    internal static void Emit(string path, Version dnuiVersion) => EmitAssemblyReferencingDnui(path, dnuiVersion);
+
     private static void EmitAssemblyReferencingDnui(string path, Version dnuiVersion)
     {
         var metadata = new MetadataBuilder();

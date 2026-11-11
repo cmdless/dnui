@@ -3,7 +3,7 @@ using Dnui.Tray;
 namespace Dnui;
 
 /// <summary>Options for <see cref="DnuiTray.StartAsync"/>.</summary>
-public sealed class DnuiTrayOptions
+public sealed record DnuiTrayOptions
 {
     /// <summary>How the runtime is found. Null means defaults: found or downloaded automatically.</summary>
     public DnuiRuntimeOptions? Runtime { get; init; }

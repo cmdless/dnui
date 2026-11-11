@@ -103,6 +103,7 @@ internal sealed class AvaloniaTrayHost : ITrayHost
                 {
                     if (menuItem.IsEnabled)
                     {
+                        AllowForegroundForCaller();
                         ItemClicked?.Invoke(id);
                     }
                 };
@@ -111,6 +112,19 @@ internal sealed class AvaloniaTrayHost : ITrayHost
             menu.Items.Add(menuItem);
         }
     }
+
+    // Windows: a tray click gives this process foreground rights for a moment. Pass them on so a
+    // dialog or window the caller starts in response can come to the front (spec 002 research R9).
+    private static void AllowForegroundForCaller()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            _ = AllowSetForegroundWindow(-1);
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool AllowSetForegroundWindow(int processId);
 
     public void Dispose()
     {

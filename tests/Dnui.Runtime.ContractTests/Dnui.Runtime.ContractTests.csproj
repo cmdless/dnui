@@ -24,13 +24,15 @@
     <ProjectReference Include="..\..\Dnui\Dnui.csproj" />
     <!-- Build-order only: the runtime executable and test apps are run, not referenced. -->
     <ProjectReference Include="..\..\Dnui.Runtime\Dnui.Runtime.csproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\Dnui.TestApps\Dnui.TestApps.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Dnui.TestApps\Dnui.TestApps.csproj" />
+    <ProjectReference Include="..\Dnui.TestApps.Extra\Dnui.TestApps.Extra.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
     <AssemblyMetadata Include="DnuiRuntimeExe" Value="$(RepoRoot)/Dnui.Runtime/bin/$(Configuration)/$(TargetFramework)/$(RuntimeExeName)" />
     <AssemblyMetadata Include="DnuiTestAppsDll" Value="$(RepoRoot)/tests/Dnui.TestApps/bin/$(Configuration)/$(TargetFramework)/Dnui.TestApps.dll" />
     <AssemblyMetadata Include="DnuiRepoRoot" Value="$(RepoRoot)" />
+    <AssemblyMetadata Include="DnuiTestAppsExtraDll" Value="$(RepoRoot)/tests/Dnui.TestApps.Extra/bin/$(Configuration)/$(TargetFramework)/Dnui.TestApps.Extra.dll" />
   </ItemGroup>
 
 </Project>

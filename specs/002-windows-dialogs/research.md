@@ -62,8 +62,9 @@ This builds on spec 001's decisions in [../001-tray-command/research.md](../001-
   `DnuiShipUiAssemblies` runs `AfterTargets="Publish"` when
   `'$(PublishAot)' == 'true' or '$(PublishSingleFile)' == 'true'` and
   `'$(DnuiShipUiAssemblies)' != 'false'`. It copies into `$(PublishDir)dnui/`:
-  - `@(IntermediateAssembly)`: the project's IL `.dll`, which exists in `obj/` for every publish
-    mode.
+  - The project's IL `.dll` from `obj/` (`$(IntermediateOutputPath)$(TargetName).dll`).
+    `@(IntermediateAssembly)` can't be used: under native AOT it's retargeted to the native
+    binary, as found during implementation.
   - `$(ProjectDepsFilePath)`: `MyApp.deps.json`, so the runtime's `AssemblyDependencyResolver` can
     resolve private dependencies.
   - `@(ReferenceCopyLocalPaths)` filtered to managed `.dll` files: NuGet and project-reference
@@ -224,3 +225,26 @@ All codes stay below 64 (runtime range). Cancellation of a dialog or window is e
   - the same `IDnuiDialogs`-based component run from the host and from window code (SC-007)
 - **Publish** (`tests/Dnui.PublishTests`): single-file on all three runners, AOT on Linux only (R4).
 - **Real desktop**: quickstart steps for modality, sheets, foreground and option rendering per OS.
+
+## R13. Findings during implementation
+
+- **Runtime-provided assemblies are excluded by package id and framework metadata.** A first
+  version shipped the whole self-contained .NET framework and StreamJsonRpc's dependency closure
+  into `dnui/`. The target now drops `ReferenceCopyLocalPaths` items with a
+  `FrameworkReferenceName` and items whose `NuGetPackageId` matches the runtime-provided list.
+  Those would never load anyway, because the runtime's own copies are on its trusted platform
+  list. Verified: `dnui/` holds only the app's `.dll` and `.deps.json`, in both single-file and
+  native AOT publishes on osx-arm64.
+- **Avalonia 12 renamed `SystemDecorations` to `WindowDecorations`.** The invisible dialog owner
+  uses `WindowDecorations.None`.
+- **XAML windows must call the generated `InitializeComponent()`.** `AvaloniaXamlLoader.Load`
+  doesn't set named-control fields.
+- **`DnuiTrayOptions` became a `sealed record`,** so host commands can derive tray options with
+  `with`. That's a spec 001 contract change, allowed because 0.1.0 is unreleased.
+- **Missing positional arguments crashed the parser** (System.CommandLine's `GetValue` throws).
+  The arguments are now read safely, and parsing itself is wrapped so bad input never crashes
+  the runtime.
+- **The app-type check gained a public parameterless constructor rule,** since the shared loader
+  applies the same rule to apps and windows. The runtime always constructs apps with
+  `Activator`, so this only moves a failure earlier.
+
