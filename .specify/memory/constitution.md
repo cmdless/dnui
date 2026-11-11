@@ -96,9 +96,10 @@ Getting the runtime onto a machine is a library responsibility.
   - `CmdlessRoot` defaults to `~/.cmdless` (the user's home directory on every OS) and is
     overridden by the `CMDLESS_ROOT` environment variable.
   - `DnuiRoot` defaults to `{CmdlessRoot}/dotnet`.
-  - Extracted NuGet packages go in `{DnuiRoot}/packages/{name}/{version}/{rid}/`, where
-    `{name}` is the package id without its RID suffix, lowercased (for example,
-    `{DnuiRoot}/packages/cmdless.dnui.runtime/0.1.0/osx-arm64/`).
+  - Extracted NuGet packages go in `{DnuiRoot}/packages/{id}/{version}/`, where `{id}` is the
+    full package id, lowercased. This matches NuGet's global packages folder. RID-specific
+    packages carry the RID in their id, so different RIDs never collide (for example,
+    `{DnuiRoot}/packages/cmdless.dnui.runtime.osx-arm64/0.1.0/`).
   - Cross-process locks go in `{DnuiRoot}/locks/`.
   - New kinds of Dnui state MUST go in a named subfolder of `DnuiRoot`, never directly in
     `CmdlessRoot`, and never anywhere else unless a plan justifies it.
@@ -195,4 +196,4 @@ incompatibility rather than a protocol error.
 - Compliance: each feature plan's Constitution Check MUST pass, or list every violation with
   its justification in the plan's complexity tracking. Unjustified violations block merge.
 
-**Version**: 2.2.0 | **Ratified**: 2026-11-08 | **Last Amended**: 2026-11-10
+**Version**: 2.2.1 | **Ratified**: 2026-11-08 | **Last Amended**: 2026-11-10
