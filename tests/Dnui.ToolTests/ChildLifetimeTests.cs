@@ -35,7 +35,7 @@ public class ChildLifetimeTests(ToolFixture tool)
     // A headless tray waits on stdin forever, so it stays alive until something ends it.
     private async Task<Process> StartIdleTrayAsync()
     {
-        var process = ProcessRunner.Start(tool.ToolExe, ["tray", "--headless"], tool.FreshEnvironment());
+        var process = ProcessRunner.Start(tool.ToolExe, ToolFixture.Headless("tray"), tool.FreshEnvironment());
         _ = process.StandardError.ReadToEndAsync();
         await process.StandardInput.BaseStream.WriteAsync("""{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":1}}"""u8.ToArray().Concat("\n"u8.ToArray()).ToArray());
         await process.StandardInput.BaseStream.FlushAsync();

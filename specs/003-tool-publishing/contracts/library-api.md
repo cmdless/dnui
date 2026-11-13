@@ -1,5 +1,10 @@
 # Contract: Library API After the Cleanup
 
+> **Superseded in part (after 0.1.0-preview.1)**: `--headless`, `--outcome`, `--dialog-outcome`,
+> and `DnuiHostOptions.Headless`/`Outcomes` were removed. Headless is the app's choice (Avalonia's
+> `UseHeadless` in `Configure`); a headless tray still works as described. See the README's
+> "Testing your UI".
+
 Package `Cmdless.Dnui`, namespace `Dnui`. This replaces the host and tray parts of
 [001 tray-client.md](../../001-tray-command/contracts/tray-client.md) and
 [002 library-api.md](../../002-windows-dialogs/contracts/library-api.md). Types not shown here

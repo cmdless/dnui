@@ -4,17 +4,15 @@ using Dnui.Hosting;
 
 namespace Dnui;
 
-/// <summary>Options for <see cref="DnuiHost"/>. They apply to every command the host starts: dialogs, windows, and trays.</summary>
+/// <summary>
+/// Options for <see cref="DnuiHost"/>. They apply to every command the host starts: dialogs, windows, and trays.
+/// To run without a display (tests, CI), choose an app whose <c>Configure</c> uses Avalonia's
+/// headless platform with <see cref="DnuiHost.WithApp{TApp}"/>.
+/// </summary>
 public sealed record DnuiHostOptions
 {
     /// <summary>How the runtime is found. Null means defaults (found or downloaded automatically).</summary>
     public DnuiRuntimeOptions? Runtime { get; init; }
-
-    /// <summary>Run every command headless (no display). Dialogs take <see cref="Outcomes"/>; trays are driven by their simulate methods.</summary>
-    public bool Headless { get; init; }
-
-    /// <summary>Headless dialog outcomes, consumed in order (one per dialog call, or per parented dialog in a window).</summary>
-    public IReadOnlyList<JsonNode?> Outcomes { get; init; } = [];
 }
 
 /// <summary>
@@ -24,21 +22,19 @@ public sealed record DnuiHostOptions
 public sealed class DnuiHost : IDnuiHostCommands
 {
     private readonly DnuiHostOptions _options;
-    private readonly OutcomeQueue _outcomes;
     private readonly AppSelection? _app;
     private readonly Func<RuntimeLaunch, CancellationToken, Task<DnuiResult>> _capture;
 
     /// <summary>Creates a host with the given options.</summary>
     public DnuiHost(DnuiHostOptions? options = null)
-        : this(options ?? new DnuiHostOptions(), outcomes: null, app: null, capture: null)
+        : this(options ?? new DnuiHostOptions(), app: null, capture: null)
     {
     }
 
     /// <summary>Test seam: <paramref name="capture"/> replaces starting one-shot runtimes.</summary>
-    internal DnuiHost(DnuiHostOptions options, OutcomeQueue? outcomes, AppSelection? app, Func<RuntimeLaunch, CancellationToken, Task<DnuiResult>>? capture)
+    internal DnuiHost(DnuiHostOptions options, AppSelection? app, Func<RuntimeLaunch, CancellationToken, Task<DnuiResult>>? capture)
     {
         _options = options;
-        _outcomes = outcomes ?? new OutcomeQueue(options.Outcomes);
         _app = app;
         _capture = capture ?? RuntimeLauncher.CaptureAsync;
     }
@@ -68,7 +64,7 @@ public sealed class DnuiHost : IDnuiHostCommands
     {
         ArgumentException.ThrowIfNullOrEmpty(appAssemblyPath);
         ArgumentException.ThrowIfNullOrEmpty(appTypeName);
-        return new DnuiHost(_options, _outcomes, new AppSelection(appAssemblyPath, appTypeName), _capture);
+        return new DnuiHost(_options, new AppSelection(appAssemblyPath, appTypeName), _capture);
     }
 
     // ---- Dialogs ----
@@ -81,7 +77,7 @@ public sealed class DnuiHost : IDnuiHostCommands
         AddCommon(args, options.Title, options.StartFolder);
         if (options.AllowMultiple) args.Add("--multiple");
         AddFilters(args, options.Filters);
-        return DialogOutcome.ReadPaths(await RunDialogAsync(args, cancellationToken).ConfigureAwait(false));
+        return DialogResults.ReadPaths(await RunDialogAsync(args, cancellationToken).ConfigureAwait(false));
     }
 
     /// <inheritdoc />
@@ -91,7 +87,7 @@ public sealed class DnuiHost : IDnuiHostCommands
         List<string> args = ["dialog", "open-folder"];
         AddCommon(args, options.Title, options.StartFolder);
         if (options.AllowMultiple) args.Add("--multiple");
-        return DialogOutcome.ReadPaths(await RunDialogAsync(args, cancellationToken).ConfigureAwait(false));
+        return DialogResults.ReadPaths(await RunDialogAsync(args, cancellationToken).ConfigureAwait(false));
     }
 
     /// <inheritdoc />
@@ -104,7 +100,7 @@ public sealed class DnuiHost : IDnuiHostCommands
         if (options.DefaultExtension is { } ext) args.AddRange(["--default-extension", ext]);
         AddFilters(args, options.Filters);
         if (!options.OverwritePrompt) args.Add("--no-overwrite-prompt");
-        return DialogOutcome.ReadPath(await RunDialogAsync(args, cancellationToken).ConfigureAwait(false));
+        return DialogResults.ReadPath(await RunDialogAsync(args, cancellationToken).ConfigureAwait(false));
     }
 
     // ---- Windows: generic → Type → strings (the CLI's window <assembly> <type>) ----
@@ -130,12 +126,7 @@ public sealed class DnuiHost : IDnuiHostCommands
     {
         ArgumentException.ThrowIfNullOrEmpty(windowAssemblyPath);
         ArgumentException.ThrowIfNullOrEmpty(windowTypeName);
-        var launch = Launch(["window", windowAssemblyPath, windowTypeName]) with
-        {
-            HeadlessOutcomes = _options.Headless ? _outcomes.TakeRemaining() : [],
-            OutcomeOption = "--dialog-outcome",
-        };
-        var result = await RunAsync(launch, cancellationToken).ConfigureAwait(false);
+        var result = await RunAsync(Launch(["window", windowAssemblyPath, windowTypeName]), cancellationToken).ConfigureAwait(false);
         return result?["result"]?.DeepClone();
     }
 
@@ -150,13 +141,10 @@ public sealed class DnuiHost : IDnuiHostCommands
 
     // ---- Plumbing ----
 
-    private RuntimeLaunch Launch(IReadOnlyList<string> command) => new(_options.Runtime, _app, command, _options.Headless);
+    private RuntimeLaunch Launch(IReadOnlyList<string> command) => new(_options.Runtime, _app, command);
 
-    private Task<JsonNode?> RunDialogAsync(List<string> args, CancellationToken cancellationToken)
-    {
-        var launch = Launch(args) with { HeadlessOutcomes = _options.Headless ? [_outcomes.Take()] : [] };
-        return RunAsync(launch, cancellationToken);
-    }
+    private Task<JsonNode?> RunDialogAsync(List<string> args, CancellationToken cancellationToken) =>
+        RunAsync(Launch(args), cancellationToken);
 
     private async Task<JsonNode?> RunAsync(RuntimeLaunch launch, CancellationToken cancellationToken)
     {

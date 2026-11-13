@@ -5,8 +5,31 @@ using Avalonia;
 
 namespace Dnui.TestApps;
 
-/// <summary>A command app that customizes startup and leaves a marker on stderr.</summary>
-public class CustomCommandApp : DnuiCommandApp
+/// <summary>
+/// The app for every headless test run: Avalonia's headless platform (no display, no focus
+/// changes) and a fake file picker (<see cref="TestStorage"/>).
+/// </summary>
+public class HeadlessApp : DnuiCommandApp
+{
+    protected override void Configure(AppBuilder builder)
+    {
+        base.Configure(builder);
+        builder.UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = true }).UseTestStorage();
+    }
+}
+
+/// <summary>Headless with no file picker at all: Avalonia's no-op storage provider.</summary>
+public class BareHeadlessApp : DnuiCommandApp
+{
+    protected override void Configure(AppBuilder builder)
+    {
+        base.Configure(builder);
+        builder.UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = true });
+    }
+}
+
+/// <summary>A headless command app that customizes startup and leaves a marker on stderr.</summary>
+public class CustomCommandApp : HeadlessApp
 {
     protected override void Configure(AppBuilder builder)
     {
@@ -65,13 +88,13 @@ public class NotAnApp
 }
 
 /// <summary>Claims stdio in its constructor, so a session command can't.</summary>
-public class EagerSessionCommandApp : DnuiCommandApp
+public class EagerSessionCommandApp : HeadlessApp
 {
     public EagerSessionCommandApp() => Stdio.OpenSession();
 }
 
 /// <summary>Writes stray console output constantly while running a command.</summary>
-public class SpammerCommandApp : DnuiCommandApp
+public class SpammerCommandApp : HeadlessApp
 {
     private readonly Timer _timer;
 

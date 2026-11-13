@@ -1,5 +1,10 @@
 # Contract: Dnui.Runtime CLI
 
+> **Superseded in part (after 0.1.0-preview.1)**: `--headless`, `--outcome`, `--dialog-outcome`,
+> and `DnuiHostOptions.Headless`/`Outcomes` were removed. Headless is the app's choice (Avalonia's
+> `UseHeadless` in `Configure`); a headless tray still works as described. See the README's
+> "Testing your UI".
+
 **Contract version**: tied to `DnuiRuntimeVersion` (constitution V)
 
 ## Synopsis

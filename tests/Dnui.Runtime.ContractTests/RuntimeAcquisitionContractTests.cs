@@ -33,7 +33,7 @@ public class RuntimeAcquisitionContractTests
     {
         Assert.SkipUnless(TestPaths.HasPackageForCurrentRid, $"Run PackRuntime for {DnuiRuntime.CurrentRid} first (the local package is missing or older than the runtime build).");
         using var root = new TempDir();
-        var host = new DnuiHost(new() { Runtime = new() { CmdlessRoot = root.Path, PackageSource = TestPaths.PackagesFeed }, Headless = true });
+        var host = new DnuiHost(new() { Runtime = new() { CmdlessRoot = root.Path, PackageSource = TestPaths.PackagesFeed } }).WithApp<Dnui.TestApps.HeadlessApp>();
         var options = new DnuiTrayOptions { Items = [new("open", "Open")] };
 
         var trays = await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => host.StartTrayAsync(options)));

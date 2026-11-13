@@ -1,5 +1,10 @@
 # Contract: `window` and `dialog` Host Commands
 
+> **Superseded in part (after 0.1.0-preview.1)**: `--headless`, `--outcome`, `--dialog-outcome`,
+> and `DnuiHostOptions.Headless`/`Outcomes` were removed. Headless is the app's choice (Avalonia's
+> `UseHeadless` in `Configure`); a headless tray still works as described. See the README's
+> "Testing your UI".
+
 Extends [../../001-tray-command/contracts/cli.md](../../001-tray-command/contracts/cli.md). The
 global options (`--app-assembly`, `--app-type`), the output contract, and exit codes 0–22 apply
 unchanged. Both commands are **one-shot**: exactly one JSON result line on stdout, then exit.

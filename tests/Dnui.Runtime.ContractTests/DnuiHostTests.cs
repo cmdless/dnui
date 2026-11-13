@@ -1,33 +1,58 @@
-using System.Text.Json.Nodes;
 using Dnui.Runtime.ContractTests.Support;
 using Dnui.TestApps;
+using static Dnui.Runtime.ContractTests.Support.RuntimeProcess;
 
 namespace Dnui.Runtime.ContractTests;
 
-/// <summary>US1/US2 through the library's host commands (DnuiHost), headless.</summary>
+/// <summary>
+/// US1/US2 through the library's host commands (DnuiHost), under the headless test app. Every
+/// call is its own runtime process, which inherits this process's environment, so fake picks are
+/// set here (<see cref="Picking"/>) and this class runs alone.
+/// </summary>
+[Collection(nameof(HostPicksCollection))]
 public class DnuiHostTests
 {
-    private static DnuiHost Host(params JsonNode?[] outcomes) => new(new()
+    private static readonly DnuiHost Plain = new(new() { Runtime = new() { RuntimePath = TestPaths.RuntimeExe } });
+
+    private static IDnuiHostCommands Host() => Plain.WithApp<HeadlessApp>();
+
+    /// <summary>Queues fake picks for the runtimes started until disposal.</summary>
+    private static IDisposable Picking(params string[] picks)
     {
-        Runtime = new() { RuntimePath = TestPaths.RuntimeExe },
-        Headless = true,
-        Outcomes = outcomes,
-    });
+        Environment.SetEnvironmentVariable(TestStorage.PicksVariable, "[" + string.Join(",", picks) + "]");
+        return new Reset();
+    }
+
+    private sealed class Reset : IDisposable
+    {
+        public void Dispose() => Environment.SetEnvironmentVariable(TestStorage.PicksVariable, null);
+    }
 
     [Fact]
     public async Task Dialogs_ReturnTypedResults()
     {
-        var host = Host(JsonNode.Parse("""{"paths":["/a","/b"]}"""), JsonNode.Parse("""{"paths":null}"""), JsonNode.Parse("""{"path":"/s"}"""));
-        Assert.Equal(["/a", "/b"], await host.OpenFilesAsync(new() { AllowMultiple = true, Filters = [new("Images", ["*.png"])] }));
-        Assert.Null(await host.OpenFoldersAsync());
-        Assert.Equal("/s", await host.SaveFileAsync(new() { SuggestedName = "s", DefaultExtension = "txt", OverwritePrompt = false }));
+        var host = Host();
+        using (Picking($"[{Json(PathFor("a"))},{Json(PathFor("b"))}]"))
+        {
+            Assert.Equal([PathFor("a"), PathFor("b")], await host.OpenFilesAsync(new() { AllowMultiple = true, Filters = [new("Images", ["*.png"])] }));
+        }
+
+        using (Picking("null"))
+        {
+            Assert.Null(await host.OpenFoldersAsync());
+        }
+
+        using (Picking(Json(PathFor("s"))))
+        {
+            Assert.Equal(PathFor("s"), await host.SaveFileAsync(new() { SuggestedName = "s", DefaultExtension = "txt", OverwritePrompt = false }));
+        }
     }
 
     [Fact]
-    public async Task HeadlessHost_StartsHeadlessTray_WithNoTraySetting()
+    public async Task HeadlessApp_StartsHeadlessTray_WithNoTraySetting()
     {
-        // Spec 003 FR-022: headless and runtime settings come only from the host. Without headless,
-        // a runner with no tray host (Linux CI) would fail to start with TrayHostUnavailable.
+        // The app chooses the platform. Without the headless app, a runner with no tray host
+        // (Linux CI) would fail to start with TrayHostUnavailable.
         await using var tray = await Host().StartTrayAsync(new() { Icon = DnuiTrayIcon.FromPng(TestPaths.Png), Items = [new("open", "Open")] });
         await tray.SimulateClickAsync("open");
         Assert.True((await tray.GetStateAsync()).HasIcon);
@@ -36,7 +61,7 @@ public class DnuiHostTests
     [Fact]
     public async Task HostRuntimeSetting_AppliesToEveryCommand()
     {
-        var missing = new DnuiHost(new() { Runtime = new() { RuntimePath = "/no/such/runtime" }, Headless = true });
+        var missing = new DnuiHost(new() { Runtime = new() { RuntimePath = "/no/such/runtime" } }).WithApp<HeadlessApp>();
         await Assert.ThrowsAsync<DnuiRuntimeUnavailableException>(() => missing.SaveFileAsync());
         await Assert.ThrowsAsync<DnuiRuntimeUnavailableException>(() => missing.OpenWindowAsync<ResolveOnOpenWindow>());
         await Assert.ThrowsAsync<DnuiRuntimeUnavailableException>(() => missing.StartTrayAsync(new()));
@@ -45,7 +70,7 @@ public class DnuiHostTests
     [Fact]
     public async Task WithApp_AllFormsRunTheCustomApp()
     {
-        var host = Host();
+        var host = Plain;
         Assert.Equal("x", (await host.WithApp<CustomCommandApp>().OpenWindowAsync<ResolveOnOpenWindow>())?["name"]?.GetValue<string>());
         Assert.Equal("x", (await host.WithApp(typeof(CustomCommandApp)).OpenWindowAsync<ResolveOnOpenWindow>())?["name"]?.GetValue<string>());
         Assert.Equal("x", (await host.WithApp(TestPaths.TestAppsDll, typeof(CustomCommandApp).FullName!).OpenWindowAsync<ResolveOnOpenWindow>())?["name"]?.GetValue<string>());
@@ -81,8 +106,12 @@ public class DnuiHostTests
     public async Task SharedComponent_BehavesTheSameOnBothSurfaces()
     {
         // SC-007: the same IDnuiDialogs-based component from the host and from window code.
-        var fromHost = await SharedComponent.DescribeSaveAsync(Host(JsonNode.Parse("""{"path":"/same.txt"}""")));
-        var fromWindow = await Host(JsonNode.Parse("""{"path":"/same.txt"}""")).OpenWindowAsync<SharedComponentWindow>();
+        using var picks = Picking(Json(PathFor("same.txt")));
+        var fromHost = await SharedComponent.DescribeSaveAsync(Host());
+        var fromWindow = await Host().OpenWindowAsync<SharedComponentWindow>();
         Assert.Equal(fromHost, fromWindow?["described"]?.GetValue<string>());
     }
 }
+
+[CollectionDefinition(nameof(HostPicksCollection), DisableParallelization = true)]
+public sealed class HostPicksCollection;

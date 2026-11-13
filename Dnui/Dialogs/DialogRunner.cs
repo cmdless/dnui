@@ -40,14 +40,13 @@ internal static class DialogRunner
 
     private static FilePickerFileType ToType(DnuiFileFilter f) => new(f.Name) { Patterns = [.. f.Patterns] };
 
-    /// <summary>Shows the dialog parented to <paramref name="owner"/> (or takes a headless outcome).</summary>
+    /// <summary>
+    /// Shows the dialog parented to <paramref name="owner"/>, through the owner's storage provider.
+    /// On the headless platform that's Avalonia's no-op provider (unsupported) unless the app
+    /// registered its own <c>IStorageProviderFactory</c>.
+    /// </summary>
     public static async Task<JsonObject> RunAsync(TopLevel? owner, DialogKind kind, object options)
     {
-        if (HeadlessOutcomes.IsHeadless)
-        {
-            return HeadlessOutcomes.Next(kind);
-        }
-
         var storage = (owner ?? throw new InvalidOperationException("A dialog needs an owner window.")).StorageProvider;
         var startPath = options switch
         {
@@ -69,14 +68,14 @@ internal static class DialogRunner
             default:
                 if (!storage.CanSave) throw new DialogUnsupportedException(kind);
                 var file = await storage.SaveFilePickerAsync(Map((DnuiSaveFileOptions)options, start)).ConfigureAwait(true);
-                return file?.TryGetLocalPath() is { } path ? DialogOutcome.Path(path) : DialogOutcome.Cancelled(kind);
+                return file?.TryGetLocalPath() is { } path ? DialogResults.Path(path) : DialogResults.Cancelled(kind);
         }
     }
 
     private static JsonObject Paths(DialogKind kind, IEnumerable<IStorageItem> items)
     {
         var paths = items.Select(i => i.TryGetLocalPath()).OfType<string>().ToList();
-        return paths.Count == 0 ? DialogOutcome.Cancelled(kind) : DialogOutcome.Paths(paths);
+        return paths.Count == 0 ? DialogResults.Cancelled(kind) : DialogResults.Paths(paths);
     }
 
     private static async Task<IStorageFolder?> TryGetFolderAsync(IStorageProvider storage, string? path)

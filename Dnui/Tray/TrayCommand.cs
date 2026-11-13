@@ -10,7 +10,7 @@ namespace Dnui.Tray;
 /// <c>tray</c>: a session command that drives one tray icon over JSON-RPC on the stdio session
 /// (research R6–R8). Uses the same public <see cref="DnuiStdio.OpenSession"/> as consumers.
 /// </summary>
-internal sealed class TrayCommand(bool headless) : DnuiCommand
+internal sealed class TrayCommand : DnuiCommand
 {
     private JsonRpc? _rpc;
     private TrayNotifier? _notifier;
@@ -19,8 +19,6 @@ internal sealed class TrayCommand(bool headless) : DnuiCommand
     public override bool IsSession => true;
 
     public override bool HideDockIcon => true;
-
-    public bool Headless => headless;
 
     public override int? Prepare(DnuiCommandApp app)
     {
@@ -61,7 +59,7 @@ internal sealed class TrayCommand(bool headless) : DnuiCommand
         var rpc = _rpc ?? throw new InvalidOperationException("tray was not prepared.");
         lifetime.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-        ITrayHost host = headless ? new HeadlessTrayHost() : new AvaloniaTrayHost(app);
+        ITrayHost host = DnuiPlatformHooks.IsHeadless ? new HeadlessTrayHost() : new AvaloniaTrayHost(app);
         _target!.AttachHost(host);
         lifetime.Exit += (_, _) =>
         {

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Dnui.ToolTests.Support;
 
 namespace Dnui.ToolTests;
@@ -11,10 +12,13 @@ public class ToolForwardingTests(ToolFixture tool)
     public async Task ColdCache_DownloadsRuntime_AndForwardsResult()
     {
         var env = tool.FreshEnvironment();
-        var result = await ProcessRunner.RunAsync(tool.ToolExe, ["dialog", "save-file", "--headless", "--outcome", """{"path":"/tmp/x.txt"}"""], env, Timeout);
+        var path = Path.Combine(Path.GetTempPath(), "x.txt");
+        var pick = ToolFixture.Pick(JsonSerializer.Serialize(path));
+        env[pick.Key] = pick.Value;
+        var result = await ProcessRunner.RunAsync(tool.ToolExe, ToolFixture.Headless("dialog", "save-file"), env, Timeout);
 
         Assert.True(result.ExitCode == 0, result.StdErr);
-        Assert.Equal("{\"path\":\"/tmp/x.txt\"}\n", result.StdOut.Replace("\r\n", "\n"));
+        Assert.Equal($"{{\"path\":{JsonSerializer.Serialize(path)}}}\n", result.StdOut.Replace("\r\n", "\n"));
         var installed = Path.Combine(env["CMDLESS_ROOT"]!, "dotnet", "packages", DnuiRuntime.PackageId.ToLowerInvariant(), ToolFixture.Version.ToLowerInvariant());
         Assert.True(Directory.Exists(installed), installed);
     }
@@ -23,22 +27,27 @@ public class ToolForwardingTests(ToolFixture tool)
     public async Task WarmCache_NeedsNoFeed()
     {
         var env = tool.FreshEnvironment();
-        await ProcessRunner.RunAsync(tool.ToolExe, ["dialog", "save-file", "--headless", "--outcome", """{"path":"a"}"""], env, Timeout);
+        var pick = ToolFixture.Pick("null");
+        env[pick.Key] = pick.Value;
+        await ProcessRunner.RunAsync(tool.ToolExe, ToolFixture.Headless("dialog", "save-file"), env, Timeout);
 
         env["DNUI_PACKAGE_SOURCE"] = tool.EmptyFeed;
-        var result = await ProcessRunner.RunAsync(tool.ToolExe, ["dialog", "save-file", "--headless", "--outcome", """{"path":"b"}"""], env, Timeout);
+        var result = await ProcessRunner.RunAsync(tool.ToolExe, ToolFixture.Headless("dialog", "save-file"), env, Timeout);
         Assert.True(result.ExitCode == 0, result.StdErr);
-        Assert.Equal("""{"path":"b"}""", result.StdOut.Trim());
+        Assert.Equal("""{"path":null}""", result.StdOut.Trim());
     }
 
     [Theory]
-    [InlineData("""{"paths":[]}""")]                       // wrong shape → Usage (2)
-    [InlineData("""{"path":"/tmp/with space/é ✓ \"q\""}""")] // spaces, quotes, non-ASCII survive
-    public async Task MatchesRuntimeDirectly(string outcome)
+    [InlineData("--filter", "bad")]                    // invalid filter → Usage (2)
+    [InlineData("--title", "with space é ✓ \"q\"")]  // spaces, quotes, non-ASCII survive the hop
+    public async Task MatchesRuntimeDirectly(string option, string value)
     {
-        string[] args = ["dialog", "save-file", "--headless", "--outcome", outcome];
-        var viaTool = await ProcessRunner.RunAsync(tool.ToolExe, args, tool.FreshEnvironment(), Timeout);
-        var direct = await ProcessRunner.RunAsync(ToolFixture.RuntimeExe, args, null, Timeout);
+        string[] args = ToolFixture.Headless("dialog", "save-file", option, value);
+        var pick = ToolFixture.Pick(JsonSerializer.Serialize(Path.Combine(Path.GetTempPath(), "with space", "é ✓ \"q\"")));
+        var env = tool.FreshEnvironment();
+        env[pick.Key] = pick.Value;
+        var viaTool = await ProcessRunner.RunAsync(tool.ToolExe, args, env, Timeout);
+        var direct = await ProcessRunner.RunAsync(ToolFixture.RuntimeExe, args, new Dictionary<string, string?> { [pick.Key] = pick.Value }, Timeout);
 
         Assert.Equal(direct.ExitCode, viaTool.ExitCode);
         Assert.Equal(direct.StdOut, viaTool.StdOut);

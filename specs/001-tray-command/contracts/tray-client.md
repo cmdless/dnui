@@ -2,6 +2,11 @@
 
 > **Superseded in part by spec 003**: the host, tray-start, and app-selection API changed before 0.1.0 was published. See [../../003-tool-publishing/contracts/library-api.md](../../003-tool-publishing/contracts/library-api.md).
 
+> **Superseded in part (after 0.1.0-preview.1)**: `--headless`, `--outcome`, `--dialog-outcome`,
+> and `DnuiHostOptions.Headless`/`Outcomes` were removed. Headless is the app's choice (Avalonia's
+> `UseHeadless` in `Configure`); a headless tray still works as described. See the README's
+> "Testing your UI".
+
 Package `Cmdless.Dnui`, namespace `Dnui`. This is the caller side of
 [tray-protocol.md](tray-protocol.md). The client hides the process, pipes, and JSON-RPC.
 

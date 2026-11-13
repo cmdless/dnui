@@ -3,8 +3,8 @@ using Dnui.Tray;
 namespace Dnui;
 
 /// <summary>
-/// What a tray shows, for <see cref="IDnuiHostCommands.StartTrayAsync"/>. The runtime, headless
-/// mode, and app come from the host (<see cref="DnuiHostOptions"/>, <see cref="IDnuiHostCommands.WithApp{TApp}"/>).
+/// What a tray shows, for <see cref="IDnuiHostCommands.StartTrayAsync"/>. The runtime and app
+/// come from the host (<see cref="DnuiHostOptions"/>, <see cref="IDnuiHostCommands.WithApp{TApp}"/>).
 /// </summary>
 public sealed record DnuiTrayOptions
 {

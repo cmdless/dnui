@@ -10,7 +10,7 @@ public class ToolSessionTests(ToolFixture tool)
     [Fact]
     public async Task TraySession_FlowsThroughTheTool()
     {
-        using var process = ProcessRunner.Start(tool.ToolExe, ["tray", "--headless"], tool.FreshEnvironment());
+        using var process = ProcessRunner.Start(tool.ToolExe, ToolFixture.Headless("tray"), tool.FreshEnvironment());
         var stderr = process.StandardError.ReadToEndAsync();
 
         async Task SendAsync(object message)

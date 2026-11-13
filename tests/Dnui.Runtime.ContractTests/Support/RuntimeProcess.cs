@@ -102,6 +102,19 @@ internal sealed class RuntimeProcess : IAsyncDisposable
     public static string[] WithTestApp(string type, params string[] args) =>
         ["--app-assembly", TestPaths.TestAppsDll, "--app-type", type, .. args];
 
+    /// <summary>Runs <paramref name="args"/> under the headless test app (no display, fake file picker).</summary>
+    public static string[] Headless(params string[] args) => WithTestApp("Dnui.TestApps.HeadlessApp", args);
+
+    /// <summary>An absolute path for this OS, for fake picks.</summary>
+    public static string PathFor(string name) => Path.Combine(Path.GetTempPath(), name);
+
+    /// <summary>A JSON string literal.</summary>
+    public static string Json(string? value) => JsonSerializer.Serialize(value);
+
+    /// <summary>Environment that queues fake file picker answers (Dnui.TestApps.TestStorage), in call order.</summary>
+    public static Dictionary<string, string?> Picks(params string[] picks) =>
+        new() { ["DNUI_TEST_PICKS"] = "[" + string.Join(",", picks) + "]" };
+
     public async Task WriteLineAsync(string line)
     {
         await _process.StandardInput.BaseStream.WriteAsync(Encoding.UTF8.GetBytes(line + "\n"));

@@ -6,9 +6,9 @@ namespace Dnui.Runtime.ContractTests;
 public class AppResolutionContractTests
 {
     [Fact]
-    public async Task DefaultApp_RunsTray()
+    public async Task CommandApp_RunsTray()
     {
-        await using var runtime = RuntimeProcess.Start("tray", "--headless");
+        await using var runtime = RuntimeProcess.Start(RuntimeProcess.Headless("tray"));
         var (init, _) = await runtime.RequestAsync("initialize", new { protocolVersion = 1 });
         Assert.True(init.TryGetProperty("result", out _));
     }
@@ -16,7 +16,7 @@ public class AppResolutionContractTests
     [Fact]
     public async Task CustomCommandApp_RunsTray_WithCustomConfigure()
     {
-        await using var runtime = RuntimeProcess.Start(RuntimeProcess.WithTestApp("Dnui.TestApps.CustomCommandApp", "tray", "--headless"));
+        await using var runtime = RuntimeProcess.Start(RuntimeProcess.WithTestApp("Dnui.TestApps.CustomCommandApp", "tray"));
         var (init, _) = await runtime.RequestAsync("initialize", new { protocolVersion = 1 });
         Assert.True(init.TryGetProperty("result", out _));
         runtime.CloseStdin();
@@ -54,7 +54,7 @@ public class AppResolutionContractTests
     [InlineData(true, null, "Dnui.TestApps.NotAnApp", 12, null)]
     public async Task ResolutionFailures(bool tray, string? assembly, string type, int exitCode, string? errorCode)
     {
-        string[] args = ["--app-assembly", assembly ?? TestPaths.TestAppsDll, "--app-type", type, .. (tray ? new[] { "tray", "--headless" } : [])];
+        string[] args = ["--app-assembly", assembly ?? TestPaths.TestAppsDll, "--app-type", type, .. (tray ? new[] { "tray" } : [])];
         await using var runtime = RuntimeProcess.Start(args);
         Assert.Equal(exitCode, await runtime.WaitForExitAsync());
 
@@ -81,7 +81,7 @@ public class AppResolutionContractTests
     [Fact]
     public async Task EagerSessionClaim_MakesTrayExit22()
     {
-        await using var runtime = RuntimeProcess.Start(RuntimeProcess.WithTestApp("Dnui.TestApps.EagerSessionCommandApp", "tray", "--headless"));
+        await using var runtime = RuntimeProcess.Start(RuntimeProcess.WithTestApp("Dnui.TestApps.EagerSessionCommandApp", "tray"));
         Assert.Equal(22, await runtime.WaitForExitAsync());
         Assert.Empty(runtime.AllStdOut);
     }

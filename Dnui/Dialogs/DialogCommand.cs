@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -8,28 +7,9 @@ using Dnui.Internal;
 namespace Dnui.Dialogs;
 
 /// <summary><c>dialog open-file|open-folder|save-file</c>: a one-shot, unparented host command (research R8, R9).</summary>
-internal sealed class DialogCommand(DialogKind kind, object options, bool headless, JsonNode? outcome) : DnuiCommand
+internal sealed class DialogCommand(DialogKind kind, object options) : DnuiCommand
 {
     public override bool IsSession => false;
-
-    public override int? Prepare(DnuiCommandApp app)
-    {
-        if (!headless)
-        {
-            return null;
-        }
-
-        // Headless: resolve the supplied outcome without starting any UI.
-        var (result, error) = DialogOutcome.Validate(kind, outcome);
-        if (result is null)
-        {
-            app.ResolveInternal(ErrorResults.Error(ErrorResults.Usage, $"--outcome: {error}."), ErrorResults.Usage);
-            return ErrorResults.Usage;
-        }
-
-        app.ResolveInternal(result, 0);
-        return 0;
-    }
 
     public override void Run(DnuiCommandApp app, IClassicDesktopStyleApplicationLifetime lifetime)
     {
@@ -63,13 +43,15 @@ internal sealed class DialogCommand(DialogKind kind, object options, bool headle
     /// An invisible owner for the picker (research R9). On macOS pickers show as sheets on their
     /// owner, so the owner is normal-sized and centered so the sheet lands in the right place.
     /// </summary>
+    /// <summary>How far above the screen's middle a macOS sheet starts (half the old 480-pixel owner).</summary>
+    private const double MacSheetDrop = 240;
+
     private static Window CreateOwner()
     {
-        var size = OperatingSystem.IsMacOS() ? new Size(640, 480) : new Size(1, 1);
-        return new Window
+        var owner = new Window
         {
-            Width = size.Width,
-            Height = size.Height,
+            Width = 1,
+            Height = 1,
             CanResize = false,
             WindowDecorations = WindowDecorations.None,
             Opacity = 0,
@@ -77,5 +59,18 @@ internal sealed class DialogCommand(DialogKind kind, object options, bool headle
             WindowStartupLocation = WindowStartupLocation.CenterScreen,
             Title = "Dnui",
         };
+
+        // A macOS sheet hangs from its owner's top centre, so put that point a little above the
+        // middle of the screen and the panel lands roughly centred.
+        if (OperatingSystem.IsMacOS() && owner.Screens.Primary is { } screen)
+        {
+            var area = screen.WorkingArea;
+            owner.WindowStartupLocation = WindowStartupLocation.Manual;
+            owner.Position = new PixelPoint(
+                area.X + area.Width / 2,
+                area.Y + area.Height / 2 - (int)(MacSheetDrop * screen.Scaling));
+        }
+
+        return owner;
     }
 }

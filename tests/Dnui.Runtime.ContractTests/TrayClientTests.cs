@@ -5,7 +5,7 @@ namespace Dnui.Runtime.ContractTests;
 /// <summary>US5: the .NET tray client, public API only, headless.</summary>
 public class TrayClientTests
 {
-    internal static readonly DnuiHost Host = new(new() { Runtime = new() { RuntimePath = TestPaths.RuntimeExe }, Headless = true });
+    internal static readonly IDnuiHostCommands Host = new DnuiHost(new() { Runtime = new() { RuntimePath = TestPaths.RuntimeExe } }).WithApp<Dnui.TestApps.HeadlessApp>();
 
     internal static DnuiTrayOptions Options(params DnuiTrayItem[] items) => new()
     {

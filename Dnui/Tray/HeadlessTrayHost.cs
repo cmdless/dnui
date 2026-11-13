@@ -1,6 +1,6 @@
 namespace Dnui.Tray;
 
-/// <summary><c>tray --headless</c>: keeps state, shows nothing, needs no tray host (FR-047).</summary>
+/// <summary>The tray on Avalonia's headless platform (chosen by the app): keeps state, shows nothing, needs no tray host (FR-047).</summary>
 internal sealed class HeadlessTrayHost : ITrayHost
 {
     public event Action? MenuOpened

@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using Dnui.Hosting;
 
 namespace Dnui.Tests.Hosting;
@@ -8,8 +7,8 @@ public class HostArgumentTests
 {
     private readonly List<string[]> _launched = [];
 
-    private DnuiHost Host(params JsonNode?[] outcomes) =>
-        new(new DnuiHostOptions { Headless = outcomes.Length > 0, Outcomes = outcomes }, outcomes: null, app: null, (launch, _) =>
+    private DnuiHost Host() =>
+        new(new DnuiHostOptions(), app: null, (launch, _) =>
         {
             _launched.Add([.. launch.Arguments()]);
             return Task.FromResult(new DnuiResult(0, launch.Command[0] == "window" ? """{"result":null}""" : """{"path":null}"""));
@@ -56,17 +55,6 @@ public class HostArgumentTests
     [Fact]
     public void OpenWindow_RejectsNonWindowTypes() =>
         Assert.Throws<ArgumentException>(() => { _ = Host().OpenWindowAsync(typeof(string)); });
-
-    [Fact]
-    public async Task BoundHosts_ShareTheOutcomeSequence()
-    {
-        var host = Host(JsonNode.Parse("""{"path":"1"}"""), JsonNode.Parse("""{"path":"2"}"""));
-        await host.SaveFileAsync();
-        await host.WithApp<TestApp>().SaveFileAsync();
-
-        Assert.Equal("""{"path":"1"}""", _launched[0][^1]);
-        Assert.Equal("""{"path":"2"}""", _launched[1][^1]);
-    }
 
     public sealed class TestApp : DnuiCommandApp;
 
