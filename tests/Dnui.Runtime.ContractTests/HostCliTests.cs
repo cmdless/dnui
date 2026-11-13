@@ -6,11 +6,11 @@ public class HostCliTests
 {
     [Theory]
     [InlineData("dialog")]
-    [InlineData("dialog", "open-file", "--headless")]
-    [InlineData("dialog", "open-file", "--outcome", "{\"paths\":null}")]
+    [InlineData("dialog", "open-file", "--headless")]                       // removed: headless is the app's choice
+    [InlineData("dialog", "open-file", "--outcome", "{\"paths\":null}")]  // removed with outcomes
     [InlineData("dialog", "open-file", "--filter", "bad")]
     [InlineData("window", "only-one-arg")]
-    [InlineData("window", "a.dll", "T", "--dialog-outcome", "{\"path\":null}")]
+    [InlineData("window", "a.dll", "T", "--dialog-outcome", "{\"path\":null}")] // removed with outcomes
     public async Task UsageErrors_ResolveUsageLine(params string[] args)
     {
         var (code, stdout, _) = await RuntimeProcess.RunAsync(null, args);

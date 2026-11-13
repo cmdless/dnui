@@ -24,13 +24,13 @@ internal sealed class DnuiWindowCommands : IDnuiWindowCommands
     }
 
     public async Task<IReadOnlyList<string>?> OpenFilesAsync(DnuiOpenFileOptions? options = null, CancellationToken cancellationToken = default) =>
-        DialogOutcome.ReadPaths(await RunDialogAsync(DialogKind.OpenFile, options ?? new(), cancellationToken).ConfigureAwait(true));
+        DialogResults.ReadPaths(await RunDialogAsync(DialogKind.OpenFile, options ?? new(), cancellationToken).ConfigureAwait(true));
 
     public async Task<IReadOnlyList<string>?> OpenFoldersAsync(DnuiOpenFolderOptions? options = null, CancellationToken cancellationToken = default) =>
-        DialogOutcome.ReadPaths(await RunDialogAsync(DialogKind.OpenFolder, options ?? new(), cancellationToken).ConfigureAwait(true));
+        DialogResults.ReadPaths(await RunDialogAsync(DialogKind.OpenFolder, options ?? new(), cancellationToken).ConfigureAwait(true));
 
     public async Task<string?> SaveFileAsync(DnuiSaveFileOptions? options = null, CancellationToken cancellationToken = default) =>
-        DialogOutcome.ReadPath(await RunDialogAsync(DialogKind.SaveFile, options ?? new(), cancellationToken).ConfigureAwait(true));
+        DialogResults.ReadPath(await RunDialogAsync(DialogKind.SaveFile, options ?? new(), cancellationToken).ConfigureAwait(true));
 
     public Task<JsonNode?> OpenWindowAsync<TWindow>(CancellationToken cancellationToken = default) where TWindow : DnuiWindow =>
         OpenWindowAsync(typeof(TWindow), cancellationToken);
@@ -84,7 +84,7 @@ internal sealed class DnuiWindowCommands : IDnuiWindowCommands
         {
             if (_ownerClosed.Task.IsCompleted)
             {
-                return DialogOutcome.Cancelled(kind);
+                return DialogResults.Cancelled(kind);
             }
 
             var dialog = Dispatcher.UIThread.InvokeAsync(() => DialogRunner.RunAsync(_owner, kind, options));
@@ -95,7 +95,7 @@ internal sealed class DnuiWindowCommands : IDnuiWindowCommands
                 cancellationToken.ThrowIfCancellationRequested();
             }
 
-            return finished == dialog ? await dialog.ConfigureAwait(true) : DialogOutcome.Cancelled(kind);
+            return finished == dialog ? await dialog.ConfigureAwait(true) : DialogResults.Cancelled(kind);
         }
         catch (DialogUnsupportedException ex)
         {

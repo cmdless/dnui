@@ -73,7 +73,7 @@ internal static class RuntimeLauncher
             return ErrorResults.RuntimeUnavailable;
         }
 
-        var launch = new RuntimeLaunch(runtimeOptions, App: null, Command: args, Headless: false);
+        var launch = new RuntimeLaunch(runtimeOptions, App: null, Command: args);
         using var process = Start(CreateStartInfo(runtime, launch.Arguments()));
         using var tracking = ChildProcessLifetime.Track(process, holdParent: true);
         await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);

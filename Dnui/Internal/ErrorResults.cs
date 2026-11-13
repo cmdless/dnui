@@ -67,4 +67,7 @@ internal static class DnuiPlatformHooks
 {
     /// <summary>Brings the process to the front before showing UI (macOS activation, research R9).</summary>
     public static Action? BringToFront { get; set; }
+
+    /// <summary>True when the app chose Avalonia's headless platform: nothing is shown, and the tray keeps state only.</summary>
+    public static bool IsHeadless { get; set; }
 }

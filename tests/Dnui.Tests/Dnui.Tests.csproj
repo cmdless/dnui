@@ -15,10 +15,22 @@
 
   <ItemGroup>
     <PackageReference Include="xunit.v3" Version="4.0.2" />
+    <!--
+      In-process UI tests on Avalonia's headless platform, through HeadlessUnitTestSession.
+      (Avalonia.Headless.XUnit is built for xUnit v3 3.x and fails discovery on 4.x.)
+    -->
+    <PackageReference Include="Avalonia.Headless" Version="$(AvaloniaVersion)" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\Dnui\Dnui.csproj" />
+    <ProjectReference Include="..\Dnui.TestApps\Dnui.TestApps.csproj" />
+    <!-- Built, not referenced: a window loads it by path at run time. -->
+    <ProjectReference Include="..\Dnui.TestApps.Extra\Dnui.TestApps.Extra.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyMetadata Include="DnuiTestAppsExtraDll" Value="$(MSBuildThisFileDirectory)../Dnui.TestApps.Extra/bin/$(Configuration)/$(TargetFramework)/Dnui.TestApps.Extra.dll" />
   </ItemGroup>
 
 </Project>

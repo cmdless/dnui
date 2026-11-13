@@ -1,47 +1,54 @@
 using Dnui.Runtime.ContractTests.Support;
+using static Dnui.Runtime.ContractTests.Support.RuntimeProcess;
 
 namespace Dnui.Runtime.ContractTests;
 
-/// <summary>US1: dialog host commands, headless.</summary>
+/// <summary>US1: dialog host commands, under the headless test app with a fake file picker.</summary>
 public class DialogCommandTests
 {
-    [Theory]
-    [InlineData("open-file", """{"paths":["/a","/b"]}""")]
-    [InlineData("open-file", """{"paths":null}""")]
-    [InlineData("open-folder", """{"paths":["/dir"]}""")]
-    [InlineData("save-file", """{"path":"/x.txt"}""")]
-    [InlineData("save-file", """{"path":null}""")]
-    public async Task Outcome_IsTheSingleResultLine(string kind, string outcome)
+    public static TheoryData<string, string, string> Picks => new()
     {
-        var (code, stdout, _) = await RuntimeProcess.RunAsync(null, "dialog", kind, "--title", "T", "--headless", "--outcome", outcome);
+        { "open-file", $"[{Json(PathFor("a"))},{Json(PathFor("b"))}]", "{\"paths\":[" + Json(PathFor("a")) + "," + Json(PathFor("b")) + "]}" },
+        { "open-file", "null", """{"paths":null}""" },
+        { "open-folder", $"[{Json(PathFor("dir"))}]", "{\"paths\":[" + Json(PathFor("dir")) + "]}" },
+        { "save-file", Json(PathFor("x.txt")), "{\"path\":" + Json(PathFor("x.txt")) + "}" },
+        { "save-file", "null", """{"path":null}""" },
+    };
+
+    [Theory]
+    [MemberData(nameof(Picks))]
+    public async Task Pick_IsTheSingleResultLine(string kind, string pick, string expected)
+    {
+        var (code, stdout, _) = await RunAsync(RuntimeProcess.Picks(pick), Headless("dialog", kind, "--title", "T"));
         Assert.Equal(0, code);
-        Assert.Equal(outcome, Assert.Single(stdout));
+        Assert.Equal(expected, Assert.Single(stdout));
     }
 
     [Fact]
-    public async Task WrongShape_IsUsageError()
+    public async Task NoPicker_IsDialogUnsupported()
     {
-        var (code, stdout, _) = await RuntimeProcess.RunAsync(null, "dialog", "save-file", "--headless", "--outcome", """{"paths":["/a"]}""");
-        Assert.Equal(2, code);
-        Assert.Contains("Usage", Assert.Single(stdout));
+        var (code, stdout, _) = await RunAsync(null, WithTestApp("Dnui.TestApps.BareHeadlessApp", "dialog", "open-file"));
+        Assert.Equal(30, code);
+        Assert.Contains("\"code\":\"DialogUnsupported\"", Assert.Single(stdout));
     }
 
     [Fact]
     public async Task AppOverride_IsAccepted()
     {
-        var (code, stdout, _) = await RuntimeProcess.RunAsync(null, "--app-assembly", TestPaths.TestAppsDll, "--app-type", "Dnui.TestApps.CustomCommandApp",
-            "dialog", "open-folder", "--headless", "--outcome", """{"paths":null}""");
+        var (code, stdout, stderr) = await RunAsync(RuntimeProcess.Picks("null"), WithTestApp("Dnui.TestApps.CustomCommandApp", "dialog", "open-folder"));
         Assert.Equal(0, code);
         Assert.Equal("""{"paths":null}""", Assert.Single(stdout));
+        Assert.Contains("dnui-test: custom-configure", stderr);
     }
 
     [Fact]
-    public async Task AllOptions_Parse()
+    public async Task AllOptions_ReachThePicker()
     {
-        var (code, stdout, _) = await RuntimeProcess.RunAsync(null, "dialog", "save-file", "--title", "Save", "--suggested-name", "report",
-            "--default-extension", "pdf", "--filter", "PDF:*.pdf", "--filter", "Text:*.txt,*.md", "--start-folder", "/tmp", "--no-overwrite-prompt",
-            "--headless", "--outcome", """{"path":"/tmp/report.pdf"}""");
+        var (code, stdout, stderr) = await RunAsync(RuntimeProcess.Picks(Json(PathFor("report.pdf"))), Headless("dialog", "save-file", "--title", "Save",
+            "--suggested-name", "report", "--default-extension", "pdf", "--filter", "PDF:*.pdf", "--filter", "Text:*.txt,*.md",
+            "--start-folder", Path.GetTempPath(), "--no-overwrite-prompt"));
         Assert.Equal(0, code);
         Assert.Single(stdout);
+        Assert.Contains("dnui-test: picker save-file title=Save name=report extension=pdf filters=PDF:*.pdf;Text:*.txt,*.md overwritePrompt=False", stderr);
     }
 }

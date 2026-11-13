@@ -22,7 +22,7 @@ public class TimingTests
     private static async Task<TimeSpan> StartAndInitializeAsync()
     {
         var stopwatch = Stopwatch.StartNew();
-        await using var runtime = RuntimeProcess.Start("tray", "--headless");
+        await using var runtime = RuntimeProcess.Start(RuntimeProcess.Headless("tray"));
         await runtime.RequestAsync("initialize", new { protocolVersion = 1, icon = new { png = Convert.ToBase64String(TestPaths.Png) } });
         var elapsed = stopwatch.Elapsed;
         runtime.CloseStdin();

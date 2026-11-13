@@ -22,6 +22,13 @@ public sealed class ToolFixture : IAsyncLifetime
 
     public static string Version => Metadata("DnuiRuntimeVersion");
 
+    /// <summary><paramref name="args"/> under the headless test app (no display, fake file picker).</summary>
+    public static string[] Headless(params string[] args) =>
+        ["--app-assembly", typeof(Dnui.TestApps.HeadlessApp).Assembly.Location, "--app-type", typeof(Dnui.TestApps.HeadlessApp).FullName!, .. args];
+
+    /// <summary>Environment entry that queues one fake file picker answer (JSON).</summary>
+    public static KeyValuePair<string, string?> Pick(string json) => new(Dnui.TestApps.TestStorage.PicksVariable, "[" + json + "]");
+
     private static string Configuration => Metadata("DnuiConfiguration");
 
     public string Root { get; } = Path.Combine(Path.GetTempPath(), "dnui-tool-" + Guid.NewGuid().ToString("N"));

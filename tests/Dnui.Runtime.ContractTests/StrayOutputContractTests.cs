@@ -10,7 +10,7 @@ public class StrayOutputContractTests
     public async Task TenThousandMessages_WithNoise_StayClean()
     {
         const int count = 10_000;
-        await using var runtime = RuntimeProcess.Start(RuntimeProcess.WithTestApp("Dnui.TestApps.SpammerCommandApp", "tray", "--headless"));
+        await using var runtime = RuntimeProcess.Start(RuntimeProcess.WithTestApp("Dnui.TestApps.SpammerCommandApp", "tray"));
         await runtime.RequestAsync("initialize", new { protocolVersion = 1 });
 
         for (var i = 0; i < count; i++)

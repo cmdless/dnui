@@ -12,6 +12,9 @@ namespace Dnui.Runtime;
 
 internal static class Program
 {
+    /// <summary>The windowing subsystem name Avalonia's <c>UseHeadless</c> registers.</summary>
+    private const string HeadlessSubsystemName = "Headless";
+
     // Fully synchronous until Avalonia starts (research R1–R6). Don't use Avalonia or any
     // SynchronizationContext-reliant code before BuildApp.
     [STAThread]
@@ -35,12 +38,6 @@ internal static class Program
         }
 
         var stdio = DnuiStdio.CreateFromConsole();
-        // Headless runs show nothing, so they must never pull focus from the user's desktop.
-        if (OperatingSystem.IsMacOS() && !cli.Headless)
-        {
-            DnuiPlatformHooks.BringToFront = MacForeground.Activate;
-        }
-
         try
         {
             return Run(cli, stdio);
@@ -76,14 +73,9 @@ internal static class Program
             }
 
             command = CreateCommand(cli);
-            if (cli.CommandName == RuntimeCommandLine.WindowCommandName && cli.Headless)
-            {
-                HeadlessOutcomes.Enable(cli.DialogOutcomes);
-            }
-
             if (command.Prepare(commandApp) is { } abortCode)
             {
-                // A one-shot command may have resolved its outcome (or an error) already.
+                // A one-shot command may have resolved its result (or an error) already.
                 if (app.PendingResolution is { } early)
                 {
                     app.WriteResult(early.Result);
@@ -91,13 +83,6 @@ internal static class Program
                 }
 
                 return abortCode;
-            }
-
-            if (cli.CommandName == RuntimeCommandLine.TrayCommandName && !cli.Headless && OperatingSystem.IsLinux()
-                && !LinuxTrayHostProbe.IsTrayHostAvailable(TimeSpan.FromSeconds(5)))
-            {
-                Console.Error.WriteLine("dnui: no system tray host (org.kde.StatusNotifierWatcher) on the session bus.");
-                return ExitCodes.TrayHostUnavailable;
             }
 
             commandApp.SetCommand(command);
@@ -113,13 +98,31 @@ internal static class Program
             return pending.ExitCode;
         }
 
-        var builder = HeadlessPlatform.Use(AppBuilder.Configure(() => app), cli);
+        var builder = AppBuilder.Configure(() => app).UsePlatformDetect();
         if (command is not null)
         {
             PlatformCommandOptions.Apply(builder, command);
         }
 
+        // The app may choose another platform here, for example Avalonia's headless platform in
+        // tests. That choice, not a command-line flag, decides whether anything is shown.
         app.ApplyConfiguration(builder);
+        var headless = builder.WindowingSubsystemName == HeadlessSubsystemName;
+        DnuiPlatformHooks.IsHeadless = headless;
+
+        // Nothing is shown headless, so never pull focus from the user's desktop.
+        if (OperatingSystem.IsMacOS() && !headless)
+        {
+            DnuiPlatformHooks.BringToFront = MacForeground.Activate;
+        }
+
+        if (command is TrayCommand && !headless && OperatingSystem.IsLinux()
+            && !LinuxTrayHostProbe.IsTrayHostAvailable(TimeSpan.FromSeconds(5)))
+        {
+            Console.Error.WriteLine("dnui: no system tray host (org.kde.StatusNotifierWatcher) on the session bus.");
+            return ExitCodes.TrayHostUnavailable;
+        }
+
         var exitCode = builder.StartWithClassicDesktopLifetime([]);
 
         // A Resolve that landed after the lifetime ended (or never ran) is still honored.
@@ -152,9 +155,9 @@ internal static class Program
 
     private static DnuiCommand CreateCommand(RuntimeInvocation cli) => cli.CommandName switch
     {
-        RuntimeCommandLine.TrayCommandName => new TrayCommand(cli.Headless),
+        RuntimeCommandLine.TrayCommandName => new TrayCommand(),
         RuntimeCommandLine.WindowCommandName => new WindowCommand(cli.WindowAssembly!, cli.WindowType!),
-        RuntimeCommandLine.DialogCommandName => new DialogCommand(cli.DialogKind!.Value, cli.DialogOptions!, cli.Headless, cli.Outcome),
+        RuntimeCommandLine.DialogCommandName => new DialogCommand(cli.DialogKind!.Value, cli.DialogOptions!),
         _ => throw new InvalidOperationException($"Unknown command '{cli.CommandName}'."),
     };
 

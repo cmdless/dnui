@@ -14,4 +14,18 @@
     <PackageReference Include="Avalonia.Headless" Version="$(AvaloniaVersion)" />
   </ItemGroup>
 
+  <!--
+    TestStorage fakes Avalonia's file pickers. Avalonia's reference assemblies make IStorageProvider
+    and IStorageItem impossible to implement (a hidden member); its implementation assembly doesn't.
+    Test code only: compile against the implementation copy of Avalonia.Base.
+  -->
+  <Target Name="CompileAgainstAvaloniaBaseImplementation" AfterTargets="ResolveAssemblyReferences" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <_DnuiAvaloniaBaseRef Include="@(ReferencePath)" Condition="'%(Filename)' == 'Avalonia.Base' And $([System.String]::Copy('%(FullPath)').Contains('ref'))" />
+      <_DnuiAvaloniaBaseLib Include="@(_DnuiAvaloniaBaseRef->'%(FullPath)'->Replace('/ref/', '/lib/')->Replace('\ref\', '\lib\'))" />
+      <ReferencePath Remove="@(_DnuiAvaloniaBaseRef)" />
+      <ReferencePath Include="@(_DnuiAvaloniaBaseLib)" />
+    </ItemGroup>
+  </Target>
+
 </Project>

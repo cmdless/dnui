@@ -50,7 +50,7 @@ public sealed class DnuiTray : IAsyncDisposable
     public Task<DnuiResult> Completion { get; }
 
     /// <summary>
-    /// Starts the runtime from <paramref name="launch"/> (the host's runtime, headless mode, and app,
+    /// Starts the runtime from <paramref name="launch"/> (the host's runtime and app,
     /// plus <c>tray</c>), creates the tray, runs <see cref="DnuiTrayOptions.Configure"/>, and completes
     /// once the tray has been initialized with the icon, tooltip, and items from <paramref name="options"/>.
     /// Public callers start trays through <see cref="IDnuiHostCommands.StartTrayAsync"/>.

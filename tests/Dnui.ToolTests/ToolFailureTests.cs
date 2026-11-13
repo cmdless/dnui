@@ -8,10 +8,10 @@ public class ToolFailureTests(ToolFixture tool)
 {
     [Theory]
     [InlineData("dialog", "open-file")]
-    [InlineData("tray", "--headless")]
-    public async Task EmptyFeed_ResolvesRuntimeUnavailable(string command, string option)
+    [InlineData("tray")]
+    public async Task EmptyFeed_ResolvesRuntimeUnavailable(params string[] command)
     {
-        var result = await ProcessRunner.RunAsync(tool.ToolExe, [command, option], tool.FreshEnvironment(tool.EmptyFeed), TimeSpan.FromMinutes(2));
+        var result = await ProcessRunner.RunAsync(tool.ToolExe, command, tool.FreshEnvironment(tool.EmptyFeed), TimeSpan.FromMinutes(2));
 
         Assert.Equal(40, result.ExitCode);
         var lines = result.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries);

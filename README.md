@@ -68,16 +68,29 @@ public partial class SettingsWindow : DnuiWindow
 
 ## Testing your UI
 
-Windows and dialogs have a headless mode for CI, with no display needed:
+There's no headless flag. Headless is a choice your app makes, the same way it is in any
+Avalonia app: choose an app whose `Configure` uses Avalonia's headless platform.
 
 ```csharp
-var host  = new DnuiHost(new() { Headless = true, Outcomes = [new JsonObject { ["paths"] = new JsonArray("/tmp/a.png") }] });
-var files = await host.OpenFilesAsync();          // returns the supplied outcome
-var form  = await host.OpenWindowAsync<MyForm>(); // runs your window on Avalonia's headless platform
+public class HeadlessTestApp : DnuiCommandApp
+{
+    protected override void Configure(AppBuilder builder)
+    {
+        base.Configure(builder);
+        builder.UseHeadless(new AvaloniaHeadlessPlatformOptions()); // package Avalonia.Headless
+    }
+}
+
+var form = await new DnuiHost().WithApp<HeadlessTestApp>().OpenWindowAsync<MyForm>();
 ```
 
-On the CLI, use `dialog … --headless --outcome '<json>'`, and `window … --headless --dialog-outcome '<json>'`
-for a window's own dialogs.
+On the CLI that's `--app-assembly <dll> --app-type <HeadlessTestApp>`. Under a headless app nothing
+is shown and nothing takes focus, and a tray keeps its state without an OS icon (drive it with
+`tray/simulateOpen` and `tray/simulateClick`).
+
+Headless has no file picker: a dialog fails with `DialogUnsupported` (exit 30) unless the app
+registers its own `IStorageProviderFactory` in `Configure`, the Avalonia way to supply picks.
+For code that only calls dialogs, substitute a fake `IDnuiDialogs` instead.
 
 ## Where things live
 
@@ -93,13 +106,14 @@ for a window's own dialogs.
 `Dnui.Runtime` is a CLI host:
 
 ```bash
-Dnui.Runtime [--app-assembly <dll> --app-type <type>] tray [--headless]
+Dnui.Runtime [--app-assembly <dll> --app-type <type>] tray
 ```
 
 - **`tray`** speaks newline-delimited JSON-RPC 2.0 on stdin/stdout
   ([protocol](specs/001-tray-command/contracts/tray-protocol.md)). Closing stdin ends it.
-- **`--headless`** runs on Avalonia's headless platform with a simulated tray icon: no display, no Dock icon, no focus changes. With `tray/getState`,
-  `tray/simulateOpen`, and `tray/simulateClick` it is how automated tests drive a tray.
+- **Headless**: an app that uses Avalonia's headless platform gets a tray with no OS icon: no
+  display, no Dock icon, no focus changes. With `tray/getState`, `tray/simulateOpen`, and
+  `tray/simulateClick` it is how automated tests drive a tray.
 - **Custom apps**: derive from `DnuiCommandApp` to customize the built-in commands, or from
   `DnuiApp` to take over entirely — then either `Resolve(json, exitCode)` once, or claim
   `Stdio.OpenSession()` and speak your own protocol.

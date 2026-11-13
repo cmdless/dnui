@@ -10,13 +10,16 @@ public class ToolTimingTests(ToolFixture tool)
     [Fact]
     public async Task WarmCacheOverhead_IsUnderHalfASecond()
     {
-        string[] args = ["dialog", "save-file", "--headless", "--outcome", """{"path":"t"}"""];
+        string[] args = ToolFixture.Headless("dialog", "save-file");
+        var pick = ToolFixture.Pick("null");
         var env = tool.FreshEnvironment();
+        env[pick.Key] = pick.Value;
+        var directEnv = new Dictionary<string, string?> { [pick.Key] = pick.Value };
         await ProcessRunner.RunAsync(tool.ToolExe, args, env, TimeSpan.FromMinutes(3)); // warm the cache and the disk
-        await ProcessRunner.RunAsync(ToolFixture.RuntimeExe, args, null, TimeSpan.FromMinutes(1));
+        await ProcessRunner.RunAsync(ToolFixture.RuntimeExe, args, directEnv, TimeSpan.FromMinutes(1));
 
         var viaTool = await BestOfAsync(() => ProcessRunner.RunAsync(tool.ToolExe, args, env, TimeSpan.FromMinutes(1)));
-        var direct = await BestOfAsync(() => ProcessRunner.RunAsync(ToolFixture.RuntimeExe, args, null, TimeSpan.FromMinutes(1)));
+        var direct = await BestOfAsync(() => ProcessRunner.RunAsync(ToolFixture.RuntimeExe, args, directEnv, TimeSpan.FromMinutes(1)));
 
         Assert.True(viaTool - direct <= TimeSpan.FromMilliseconds(500), $"tool {viaTool.TotalMilliseconds} ms vs runtime {direct.TotalMilliseconds} ms");
     }

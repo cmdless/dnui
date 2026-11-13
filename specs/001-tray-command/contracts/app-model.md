@@ -1,5 +1,10 @@
 # Contract: Dnui App Model (public API)
 
+> **Superseded in part (after 0.1.0-preview.1)**: `--headless`, `--outcome`, `--dialog-outcome`,
+> and `DnuiHostOptions.Headless`/`Outcomes` were removed. Headless is the app's choice (Avalonia's
+> `UseHeadless` in `Configure`); a headless tray still works as described. See the README's
+> "Testing your UI".
+
 Package `Cmdless.Dnui`, namespace `Dnui`. This is the complete public surface added by this
 feature. Everything else is `internal`.
 

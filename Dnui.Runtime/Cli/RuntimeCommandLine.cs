@@ -1,6 +1,4 @@
 using System.CommandLine;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using Dnui.Dialogs;
 
 namespace Dnui.Runtime.Cli;
@@ -10,7 +8,6 @@ internal sealed record RuntimeInvocation(
     string? AppAssembly,
     string? AppType,
     string? CommandName,
-    bool Headless,
     bool SessionRequested,
     IReadOnlyList<string> Errors,
     ParseResult ParseResult,
@@ -20,13 +17,9 @@ internal sealed record RuntimeInvocation(
 
     public string? WindowType { get; init; }
 
-    public IReadOnlyList<JsonNode?> DialogOutcomes { get; init; } = [];
-
     public DialogKind? DialogKind { get; init; }
 
     public object? DialogOptions { get; init; }
-
-    public JsonNode? Outcome { get; init; }
 }
 
 internal static class RuntimeCommandLine
@@ -49,19 +42,14 @@ internal static class RuntimeCommandLine
         Recursive = true,
     };
 
-    private static readonly Option<bool> s_trayHeadless = new("--headless") { Description = "Run the tray without a real OS tray icon (tests, CI)." };
-
     // window
     private static readonly Argument<string> s_windowAssembly = new("assembly-path") { Description = "IL assembly containing the window type." };
     private static readonly Argument<string> s_windowType = new("type-name") { Description = "Full name of a Dnui.DnuiWindow subclass." };
-    private static readonly Option<bool> s_windowHeadless = new("--headless") { Description = "Avalonia headless platform: no display." };
-    private static readonly Option<string[]> s_dialogOutcome = new("--dialog-outcome") { Description = "Headless only, repeatable: outcomes for the window's dialogs, in order.", Arity = ArgumentArity.ZeroOrMore };
 
     // dialog (shared option instances are not allowed across commands, so each subcommand builds its own)
     private sealed record DialogOptionSet(
         Option<string?> Title, Option<bool> Multiple, Option<string[]> Filter, Option<string?> StartFolder,
-        Option<string?> SuggestedName, Option<string?> DefaultExtension, Option<bool> NoOverwritePrompt,
-        Option<bool> Headless, Option<string?> Outcome);
+        Option<string?> SuggestedName, Option<string?> DefaultExtension, Option<bool> NoOverwritePrompt);
 
     private static readonly Command s_tray = CreateTray();
     private static readonly Command s_window = CreateWindow();
@@ -72,7 +60,6 @@ internal static class RuntimeCommandLine
     private static Command CreateTray()
     {
         var tray = new Command(TrayCommandName, "Show one system tray icon controlled by JSON-RPC over stdio.");
-        tray.Options.Add(s_trayHeadless);
         tray.SetAction(_ => 0);
         return tray;
     }
@@ -82,8 +69,6 @@ internal static class RuntimeCommandLine
         var window = new Command(WindowCommandName, "Show a Dnui.DnuiWindow from an assembly and resolve its result.");
         window.Arguments.Add(s_windowAssembly);
         window.Arguments.Add(s_windowType);
-        window.Options.Add(s_windowHeadless);
-        window.Options.Add(s_dialogOutcome);
         window.SetAction(_ => 0);
         return window;
     }
@@ -106,9 +91,7 @@ internal static class RuntimeCommandLine
             new("--start-folder") { Description = "Initial folder (ignored if missing)." },
             new("--suggested-name") { Description = "Prefilled file name." },
             new("--default-extension") { Description = "Extension appended when none is typed." },
-            new("--no-overwrite-prompt") { Description = "Don't ask before choosing an existing file." },
-            new("--headless") { Description = "Show nothing; resolve --outcome." },
-            new("--outcome") { Description = "Headless only: the result JSON to resolve." });
+            new("--no-overwrite-prompt") { Description = "Don't ask before choosing an existing file." });
 
         var command = new Command(name, description);
         command.Options.Add(set.Title);
@@ -130,8 +113,6 @@ internal static class RuntimeCommandLine
             command.Options.Add(set.NoOverwritePrompt);
         }
 
-        command.Options.Add(set.Headless);
-        command.Options.Add(set.Outcome);
         command.SetAction(_ => 0);
         s_dialogs[command] = (kind, set);
         return command;
@@ -183,9 +164,6 @@ internal static class RuntimeCommandLine
             appAssembly,
             appType,
             commandName,
-            ReferenceEquals(command, s_tray) ? result.GetValue(s_trayHeadless)
-                : ReferenceEquals(command, s_window) ? result.GetValue(s_windowHeadless)
-                : s_dialogs.TryGetValue(command, out var d) && result.GetValue(d.Options.Headless),
             sessionRequested,
             errors,
             result,
@@ -193,25 +171,10 @@ internal static class RuntimeCommandLine
 
         if (ReferenceEquals(command, s_window))
         {
-            var outcomes = new List<JsonNode?>();
-            foreach (var text in result.GetValue(s_dialogOutcome) ?? [])
-            {
-                if (TryParseJson(text, errors, "--dialog-outcome") is var (ok, node) && ok)
-                {
-                    outcomes.Add(node);
-                }
-            }
-
-            if (outcomes.Count > 0 && !invocation.Headless)
-            {
-                errors.Add("--dialog-outcome requires --headless.");
-            }
-
             invocation = invocation with
             {
                 WindowAssembly = SafeValue(result, s_windowAssembly),
                 WindowType = SafeValue(result, s_windowType),
-                DialogOutcomes = outcomes,
             };
         }
         else if (s_dialogs.TryGetValue(command, out var dialog))
@@ -220,7 +183,6 @@ internal static class RuntimeCommandLine
             {
                 DialogKind = dialog.Kind,
                 DialogOptions = BuildDialogOptions(result, dialog.Kind, dialog.Options, errors),
-                Outcome = ReadOutcome(result, dialog.Options, invocation.Headless, errors),
             };
         }
 
@@ -281,41 +243,6 @@ internal static class RuntimeCommandLine
                 OverwritePrompt = !result.GetValue(o.NoOverwritePrompt),
             },
         };
-    }
-
-    private static JsonNode? ReadOutcome(ParseResult result, DialogOptionSet o, bool headless, List<string> errors)
-    {
-        var text = result.GetValue(o.Outcome);
-        if (text is null)
-        {
-            if (headless)
-            {
-                errors.Add("--headless requires --outcome.");
-            }
-
-            return null;
-        }
-
-        if (!headless)
-        {
-            errors.Add("--outcome requires --headless.");
-            return null;
-        }
-
-        return TryParseJson(text, errors, "--outcome").Node;
-    }
-
-    private static (bool Ok, JsonNode? Node) TryParseJson(string text, List<string> errors, string option)
-    {
-        try
-        {
-            return (true, JsonNode.Parse(text));
-        }
-        catch (JsonException ex)
-        {
-            errors.Add($"{option}: invalid JSON ({ex.Message}).");
-            return (false, null);
-        }
     }
 
     private static string? FirstPositional(string[] args)
