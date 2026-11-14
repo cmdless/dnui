@@ -130,7 +130,7 @@ dotnet test Dnui.slnx
 Pack a runtime for one platform into the local feed `artifacts/packages/`:
 
 ```bash
-dotnet build Dnui.Runtime -t:PackRuntime -p:RuntimeIdentifier=osx-arm64
+dotnet build src/Dnui.Runtime -t:PackRuntime -p:RuntimeIdentifier=osx-arm64
 ```
 
 Point a client at it with `new DnuiHost(new() { Runtime = new() { PackageSource = "artifacts/packages" } })`,

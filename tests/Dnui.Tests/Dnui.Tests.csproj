@@ -23,7 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Dnui\Dnui.csproj" />
+    <ProjectReference Include="..\..\src\Dnui\Dnui.csproj" />
     <ProjectReference Include="..\Dnui.TestApps\Dnui.TestApps.csproj" />
     <!-- Built, not referenced: a window loads it by path at run time. -->
     <ProjectReference Include="..\Dnui.TestApps.Extra\Dnui.TestApps.Extra.csproj" ReferenceOutputAssembly="false" />

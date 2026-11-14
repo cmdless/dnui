@@ -9,11 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Dnui\Dnui.csproj" />
+    <ProjectReference Include="..\..\src\Dnui\Dnui.csproj" />
     <!-- The self-test runs headless: SampleApp chooses Avalonia's headless platform in Configure. -->
     <PackageReference Include="Avalonia.Headless" Version="$(AvaloniaVersion)" />
   </ItemGroup>
 
   <!-- Stands in for the Cmdless.Dnui package's buildTransitive import. -->
-  <Import Project="..\..\Dnui\build\Cmdless.Dnui.targets" />
+  <Import Project="..\..\src\Dnui\build\Cmdless.Dnui.targets" />
 </Project>

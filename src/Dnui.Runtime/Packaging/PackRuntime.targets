@@ -1,11 +1,11 @@
 <Project>
   <!--
-    dotnet build Dnui.Runtime -t:PackRuntime -p:RuntimeIdentifier=<rid>
+    dotnet build src/Dnui.Runtime -t:PackRuntime -p:RuntimeIdentifier=<rid>
     Publishes a self-contained runtime for <rid> and packs it as
     artifacts/packages/Cmdless.Dnui.Runtime.<rid>.<DnuiRuntimeVersion>.nupkg (research R14).
   -->
   <PropertyGroup>
-    <DnuiArtifactsDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../artifacts'))</DnuiArtifactsDir>
+    <DnuiArtifactsDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../../artifacts'))</DnuiArtifactsDir>
   </PropertyGroup>
 
   <Target Name="PackRuntime">
@@ -23,7 +23,7 @@
 
     <RemoveDir Directories="$(_DnuiPublishDir)" />
     <Exec Command="dotnet publish &quot;$(MSBuildProjectFullPath)&quot; -c Release -r $(RuntimeIdentifier) --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=false -o &quot;$(_DnuiPublishDir)&quot;" />
-    <Exec Command="dotnet pack &quot;$(MSBuildThisFileDirectory)../../build/RuntimePackage/RuntimePackage.csproj&quot; -c Release -o &quot;$(_DnuiPackagesDir.TrimEnd('\').TrimEnd('/'))&quot; -p:DnuiRid=$(RuntimeIdentifier) -p:DnuiPublishDir=&quot;$(_DnuiPublishDir.TrimEnd('\').TrimEnd('/'))&quot;" />
+    <Exec Command="dotnet pack &quot;$(MSBuildThisFileDirectory)../../../build/RuntimePackage/RuntimePackage.csproj&quot; -c Release -o &quot;$(_DnuiPackagesDir.TrimEnd('\').TrimEnd('/'))&quot; -p:DnuiRid=$(RuntimeIdentifier) -p:DnuiPublishDir=&quot;$(_DnuiPublishDir.TrimEnd('\').TrimEnd('/'))&quot;" />
     <!-- Fail at pack time, not at download time, if the executable isn't where the downloader expects it. -->
     <Error Condition="!Exists('$(_DnuiPublishDir)$(_DnuiExeName)')" Text="Publish output is missing $(_DnuiPublishDir)$(_DnuiExeName)." />
     <Exec Command="dotnet &quot;$(MSBuildThisFileDirectory)VerifyPackage.cs&quot; &quot;$(_DnuiPackagePath)&quot; runtime/$(_DnuiExeName)" />

@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\build\package\readme\Tool.md" Pack="true" PackagePath="README.md" Visible="false" />
+    <None Include="$(DnuiPackageAssets)readme/Tool.md" Pack="true" PackagePath="README.md" Visible="false" />
   </ItemGroup>
 
 </Project>
