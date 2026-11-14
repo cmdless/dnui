@@ -52,12 +52,12 @@ public sealed class ToolFixture : IAsyncLifetime
             // Missing or older than the runtime build: pack a private copy, so the tool never installs
             // stale runtime code and nothing shared is rewritten while other test projects read it.
             var artifacts = Path.Combine(Root, "artifacts");
-            await RunChecked("dotnet", ["build", Path.Combine(RepoRoot, "Dnui.Runtime"), "-t:PackRuntime", $"-p:RuntimeIdentifier={rid}", $"-p:DnuiArtifactsDir={artifacts}"]);
+            await RunChecked("dotnet", ["build", Path.Combine(RepoRoot, "src", "Dnui.Runtime"), "-t:PackRuntime", $"-p:RuntimeIdentifier={rid}", $"-p:DnuiArtifactsDir={artifacts}"]);
             packed = Path.Combine(artifacts, "packages", runtimePackage);
         }
 
         File.Copy(packed, Path.Combine(Feed, runtimePackage));
-        await RunChecked("dotnet", ["pack", Path.Combine(RepoRoot, "Dnui.Tool"), "-c", Configuration, "--no-build", "-o", Feed]);
+        await RunChecked("dotnet", ["pack", Path.Combine(RepoRoot, "src", "Dnui.Tool"), "-c", Configuration, "--no-build", "-o", Feed]);
 
         // A private NuGet cache so a re-packed tool at the same version is never served stale.
         await RunChecked("dotnet", ["tool", "install", "--tool-path", Path.Combine(Root, "tools"), "--add-source", Feed, "--ignore-failed-sources",

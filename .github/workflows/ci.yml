@@ -39,7 +39,7 @@ jobs:
       - name: Build
         run: dotnet build Dnui.slnx -c Debug
       - name: Pack runtime for this runner (local feed for acquisition tests)
-        run: dotnet build Dnui.Runtime -t:PackRuntime -p:RuntimeIdentifier=${{ matrix.rid }}
+        run: dotnet build src/Dnui.Runtime -t:PackRuntime -p:RuntimeIdentifier=${{ matrix.rid }}
       - name: Test
         if: runner.os != 'Linux'
         run: dotnet test Dnui.slnx -c Debug --no-build

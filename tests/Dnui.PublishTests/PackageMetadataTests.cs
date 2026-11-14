@@ -21,7 +21,7 @@ public class PackageMetadataTests
         var output = Path.Combine(Path.GetTempPath(), "dnui-pack-" + Guid.NewGuid().ToString("N"));
         foreach (var project in new[] { "Dnui", "Dnui.Tool" })
         {
-            var (code, log) = await PublishModeTests.RunAsync("dotnet", ["pack", Path.Combine(RepoRoot, project), "-c", "Release", "-o", output], null, TimeSpan.FromMinutes(5));
+            var (code, log) = await PublishModeTests.RunAsync("dotnet", ["pack", Path.Combine(RepoRoot, "src", project), "-c", "Release", "-o", output], null, TimeSpan.FromMinutes(5));
             Assert.True(code == 0, log);
         }
 

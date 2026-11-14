@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Dnui\Dnui.csproj" />
+    <ProjectReference Include="..\..\src\Dnui\Dnui.csproj" />
     <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
     <!-- Takeover test apps run on the headless platform so test runs never take desktop focus. -->
     <PackageReference Include="Avalonia.Headless" Version="$(AvaloniaVersion)" />

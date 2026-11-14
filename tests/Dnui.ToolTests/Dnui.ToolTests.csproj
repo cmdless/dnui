@@ -22,16 +22,16 @@
 
   <ItemGroup>
     <!-- Build order only: the tool is packed and installed by the tests. -->
-    <ProjectReference Include="..\..\Dnui\Dnui.csproj" />
+    <ProjectReference Include="..\..\src\Dnui\Dnui.csproj" />
     <!-- Headless runs go through Dnui.TestApps.HeadlessApp (no display, fake file picker). -->
     <ProjectReference Include="..\Dnui.TestApps\Dnui.TestApps.csproj" />
-    <ProjectReference Include="..\..\Dnui.Runtime\Dnui.Runtime.csproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\..\Dnui.Tool\Dnui.Tool.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\src\Dnui.Runtime\Dnui.Runtime.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\src\Dnui.Tool\Dnui.Tool.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
     <AssemblyMetadata Include="DnuiRepoRoot" Value="$(RepoRoot)" />
-    <AssemblyMetadata Include="DnuiRuntimeExe" Value="$(RepoRoot)/Dnui.Runtime/bin/$(Configuration)/$(TargetFramework)/$(RuntimeExeName)" />
+    <AssemblyMetadata Include="DnuiRuntimeExe" Value="$(RepoRoot)/src/Dnui.Runtime/bin/$(Configuration)/$(TargetFramework)/$(RuntimeExeName)" />
     <AssemblyMetadata Include="DnuiRuntimeVersion" Value="$(DnuiRuntimeVersion)" />
     <AssemblyMetadata Include="DnuiConfiguration" Value="$(Configuration)" />
   </ItemGroup>
